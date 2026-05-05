@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>fuckSlides</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100vh; overflow: hidden; background: #22242C; }
+
+    #slide-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: none; display: block; }
+
+    .preso-nav {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      display: flex; align-items: center; gap: 0.25rem; z-index: 9999;
+      background: rgba(34,36,44,0.82); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 40px; padding: 0.3rem 0.45rem;
+    }
+    .nav-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border-radius: 50%;
+      color: rgba(255,255,255,0.7); cursor: pointer; background: transparent; border: none;
+      transition: background 0.15s, color 0.15s;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .nav-btn.active { background: rgba(56,189,248,0.15); color: #38BDF8; }
+    .nav-btn svg { width: 13px; height: 13px; }
+    .nav-btn:disabled { opacity: 0.2; cursor: default; }
+    .nav-btn:disabled:hover { background: transparent; color: rgba(255,255,255,0.7); }
+    .nav-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.1); margin: 0 0.1rem; }
+    .nav-counter {
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 0.62rem; font-weight: 600;
+      color: rgba(255,255,255,0.45); letter-spacing: 0.06em;
+      padding: 0 0.35rem; user-select: none;
+    }
+
+    /* ── Filmstrip ── */
+    #filmstrip {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 114px;
+      background: rgba(13,15,20,0.97); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255,255,255,0.08); z-index: 8890;
+      transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.2,0,0.2,1);
+    }
+    #filmstrip.open { transform: translateY(0); }
+    #filmstrip-track {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 20px; height: 100%;
+      overflow-x: auto; overflow-y: hidden; scroll-behavior: smooth;
+    }
+    #filmstrip-track::-webkit-scrollbar { height: 3px; }
+    #filmstrip-track::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+    .fs-thumb {
+      flex-shrink: 0; position: relative; width: 160px; height: 90px;
+      border-radius: 6px; overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.07); cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    }
+    .fs-thumb:hover { border-color: rgba(255,255,255,0.3); transform: translateY(-2px); }
+    .fs-thumb.current { border-color: #38BDF8; box-shadow: 0 0 0 1px #38BDF8, 0 4px 16px rgba(56,189,248,0.3); }
+    .fs-thumb-scale { position: absolute; top: 0; left: 0; width: 1280px; height: 720px; transform: scale(0.125); transform-origin: top left; pointer-events: none; }
+    .fs-thumb-scale iframe { width: 1280px; height: 720px; border: none; display: block; }
+    .fs-num { position: absolute; bottom: 3px; right: 5px; font-family: 'Inter', -apple-system, sans-serif; font-size: 0.5rem; font-weight: 700; color: rgba(255,255,255,0.3); user-select: none; }
+    .fs-thumb.current .fs-num { color: rgba(56,189,248,0.7); }
+
+    /* ── Overview ── */
+    #overview {
+      position: fixed; inset: 0; z-index: 8888;
+      background: rgba(15,17,22,0.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      display: none; flex-direction: column; opacity: 0; transition: opacity 0.2s ease;
+    }
+    #overview.open { display: flex; }
+    #overview.visible { opacity: 1; }
+    .ov-header { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 2rem 0.9rem; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .ov-title { font-family: 'Inter', -apple-system, sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.3); }
+    .ov-header-right { display: flex; align-items: center; gap: 1rem; }
+    .ov-hint { font-family: 'Inter', -apple-system, sans-serif; font-size: 0.62rem; color: rgba(255,255,255,0.2); }
+    .ov-reset { font-family: 'Inter', -apple-system, sans-serif; font-size: 0.62rem; font-weight: 600; letter-spacing: 0.06em; color: rgba(56,189,248,0.5); background: none; border: 1px solid rgba(56,189,248,0.2); border-radius: 6px; padding: 3px 10px; cursor: pointer; transition: color 0.15s, border-color 0.15s; display: none; }
+    .ov-reset.visible { display: block; }
+    .ov-reset:hover { color: #38BDF8; border-color: rgba(56,189,248,0.5); }
+    .ov-grid { flex: 1; overflow-y: auto; padding: 1.5rem 2rem 2rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; align-content: start; }
+    .ov-grid::-webkit-scrollbar { width: 6px; }
+    .ov-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    .ov-thumb { cursor: grab; border-radius: 8px; overflow: visible; border: 2px solid rgba(255,255,255,0.07); transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s, opacity 0.15s; background: #1a1c22; position: relative; }
+    .ov-thumb-inner { border-radius: 6px; overflow: hidden; }
+    .ov-thumb:hover { border-color: rgba(255,255,255,0.3); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+    .ov-thumb.current { border-color: #38BDF8; box-shadow: 0 0 0 1px #38BDF8, 0 8px 24px rgba(56,189,248,0.2); }
+    .ov-thumb.dragging { opacity: 0.3; cursor: grabbing; transform: none !important; }
+    .ov-thumb.drop-before::before, .ov-thumb.drop-after::after { content: ''; position: absolute; top: -4px; bottom: -4px; width: 3px; background: #38BDF8; border-radius: 2px; box-shadow: 0 0 8px rgba(56,189,248,0.6); z-index: 10; }
+    .ov-thumb.drop-before::before { left: -9px; }
+    .ov-thumb.drop-after::after { right: -9px; }
+    .ov-thumb-frame-wrap { width: 100%; aspect-ratio: 16/9; overflow: hidden; position: relative; pointer-events: none; }
+    .ov-thumb-frame-wrap iframe { position: absolute; top: 0; left: 0; width: 1280px; height: 720px; border: none; transform-origin: top left; pointer-events: none; }
+    .ov-thumb-label { padding: 6px 10px; font-family: 'Inter', -apple-system, sans-serif; font-size: 0.6rem; font-weight: 600; color: rgba(255,255,255,0.35); letter-spacing: 0.04em; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.05); }
+    .ov-thumb.current .ov-thumb-label { color: #38BDF8; }
+    .ov-thumb-num { font-size: 0.58rem; color: rgba(255,255,255,0.18); }
+    .ov-thumb.current .ov-thumb-num { color: rgba(56,189,248,0.5); }
+  </style>
+</head>
+<body>
+
+<iframe id="slide-frame"></iframe>
+
+<div id="filmstrip"><div id="filmstrip-track"></div></div>
+
+<nav class="preso-nav">
+  <button class="nav-btn" id="btn-prev" title="Previous (←)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L6 8l4 5"/></svg>
+  </button>
+  <span class="nav-counter" id="nav-counter">1 / 1</span>
+  <button class="nav-btn" id="btn-fs" title="Fullscreen (F)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
+  </button>
+  <div class="nav-sep"></div>
+  <button class="nav-btn" id="btn-filmstrip" title="Filmstrip (T)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="0.5" y="5" width="4" height="6" rx="0.8"/><rect x="6" y="5" width="4" height="6" rx="0.8"/><rect x="11.5" y="5" width="4" height="6" rx="0.8"/></svg>
+  </button>
+  <button class="nav-btn" id="btn-overview" title="Slide overview (G)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="5.5" height="4" rx="1"/><rect x="9.5" y="1" width="5.5" height="4" rx="1"/><rect x="1" y="7.5" width="5.5" height="4" rx="1"/><rect x="9.5" y="7.5" width="5.5" height="4" rx="1"/></svg>
+  </button>
+  <button class="nav-btn" id="btn-next" title="Next (→)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l4 5-4 5"/></svg>
+  </button>
+</nav>
+
+<div id="overview">
+  <div class="ov-header">
+    <span class="ov-title">Slide Overview</span>
+    <div class="ov-header-right">
+      <button class="ov-reset" id="btn-reset">↺ Reset order</button>
+      <span class="ov-hint">Drag to reorder · click to jump · G or Esc to close</span>
+    </div>
+  </div>
+  <div class="ov-grid" id="ov-grid"></div>
+</div>
+
+<script>
+'use strict';
+
+// Injected by the dev server; falls back gracefully for direct file:// open
+const SLIDES_DEFAULT = window.FUCKSLIDES_SLIDES || [];
+const LABELS_DEFAULT = window.FUCKSLIDES_LABELS || SLIDES_DEFAULT.map(s => s.replace('.html', ''));
+
+const LS_KEY = 'fs-slide-order-' + (window.FUCKSLIDES_NAME || 'default');
+
+let slides = loadOrder();
+let labels = slides.map(s => LABELS_DEFAULT[SLIDES_DEFAULT.indexOf(s)] || s.replace('.html', ''));
+
+function loadOrder() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_KEY));
+    if (Array.isArray(saved) && saved.length === SLIDES_DEFAULT.length &&
+        saved.every(s => SLIDES_DEFAULT.includes(s))) return saved;
+  } catch (_) {}
+  return [...SLIDES_DEFAULT];
+}
+
+function saveOrder() { localStorage.setItem(LS_KEY, JSON.stringify(slides)); }
+function isDefaultOrder() { return slides.every((s, i) => s === SLIDES_DEFAULT[i]); }
+
+const frame     = document.getElementById('slide-frame');
+const counter   = document.getElementById('nav-counter');
+const btnPrev   = document.getElementById('btn-prev');
+const btnNext   = document.getElementById('btn-next');
+const btnFs     = document.getElementById('btn-fs');
+const btnOv     = document.getElementById('btn-overview');
+const btnFs2    = document.getElementById('btn-filmstrip');
+const btnReset  = document.getElementById('btn-reset');
+const overview  = document.getElementById('overview');
+const ovGrid    = document.getElementById('ov-grid');
+const filmstrip = document.getElementById('filmstrip');
+const fsTrack   = document.getElementById('filmstrip-track');
+
+let idx = parseInt(location.hash.slice(1)) || 0;
+let ovOpen = false, fsOpen = false, thumbsBuilt = false, fsBuilt = false;
+if (idx < 0 || idx >= slides.length) idx = 0;
+
+function go(newIdx) {
+  idx = Math.max(0, Math.min(slides.length - 1, newIdx));
+  location.replace('#' + idx);
+  frame.src = slides[idx];
+  counter.textContent = (idx + 1) + ' / ' + slides.length;
+  btnPrev.disabled = idx === 0;
+  btnNext.disabled = idx === slides.length - 1;
+  if (thumbsBuilt) updateThumbHighlight();
+  if (fsBuilt) updateFilmstripHighlight();
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  else document.exitFullscreen();
+}
+
+// ── Overview ─────────────────────────────────────────────────────────────────
+function buildThumbs() {
+  if (thumbsBuilt) return;
+  thumbsBuilt = true;
+  slides.forEach((slide, i) => appendThumb(slide, i));
+}
+
+function appendThumb(slide, i) {
+  const thumb = document.createElement('div');
+  thumb.className = 'ov-thumb';
+  thumb.dataset.slide = slide;
+  thumb.dataset.i = i;
+  thumb.draggable = true;
+
+  const inner = document.createElement('div');
+  inner.className = 'ov-thumb-inner';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'ov-thumb-frame-wrap';
+
+  const fr = document.createElement('iframe');
+  fr.src = slide;
+  fr.setAttribute('scrolling', 'no');
+  wrap.appendChild(fr);
+
+  const ro = new ResizeObserver(entries => {
+    for (const e of entries) {
+      const scale = e.contentRect.width / 1280;
+      fr.style.transform = `scale(${scale})`;
+      wrap.style.height = (720 * scale) + 'px';
+    }
+    ro.disconnect();
+  });
+  ro.observe(wrap);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'ov-thumb-label';
+  lbl.innerHTML = `<span class="ov-thumb-name">${labels[i]}</span><span class="ov-thumb-num">${i + 1}</span>`;
+
+  inner.appendChild(wrap);
+  inner.appendChild(lbl);
+  thumb.appendChild(inner);
+
+  thumb.addEventListener('click', e => { if (e.defaultPrevented) return; go(parseInt(thumb.dataset.i)); closeOverview(); });
+  thumb.addEventListener('dragstart', onDragStart);
+  thumb.addEventListener('dragover',  onDragOver);
+  thumb.addEventListener('dragleave', onDragLeave);
+  thumb.addEventListener('drop',      onDrop);
+  thumb.addEventListener('dragend',   onDragEnd);
+
+  ovGrid.appendChild(thumb);
+}
+
+function updateThumbHighlight() {
+  ovGrid.querySelectorAll('.ov-thumb').forEach(el => el.classList.toggle('current', parseInt(el.dataset.i) === idx));
+  const cur = ovGrid.querySelector('.ov-thumb.current');
+  if (cur) cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function refreshThumbCounters() {
+  ovGrid.querySelectorAll('.ov-thumb').forEach((el, i) => {
+    el.dataset.i = i;
+    el.querySelector('.ov-thumb-num').textContent = i + 1;
+    el.querySelector('.ov-thumb-name').textContent = labels[i];
+  });
+  btnReset.classList.toggle('visible', !isDefaultOrder());
+}
+
+function openOverview() {
+  if (fsOpen) closeFilmstrip();
+  ovOpen = true; buildThumbs();
+  overview.style.display = 'flex';
+  btnOv.classList.add('active');
+  btnReset.classList.toggle('visible', !isDefaultOrder());
+  requestAnimationFrame(() => { overview.classList.add('visible'); updateThumbHighlight(); });
+}
+function closeOverview() {
+  ovOpen = false; overview.classList.remove('visible'); btnOv.classList.remove('active');
+  setTimeout(() => { overview.style.display = 'none'; }, 200);
+}
+function toggleOverview() { ovOpen ? closeOverview() : openOverview(); }
+
+// ── Filmstrip ─────────────────────────────────────────────────────────────────
+function buildFilmstrip() {
+  if (fsBuilt) return;
+  fsBuilt = true;
+  slides.forEach((slide, i) => {
+    const thumb = document.createElement('div');
+    thumb.className = 'fs-thumb' + (i === idx ? ' current' : '');
+    thumb.dataset.i = i;
+    const scale = document.createElement('div');
+    scale.className = 'fs-thumb-scale';
+    const fr = document.createElement('iframe');
+    fr.src = slide; fr.setAttribute('scrolling', 'no');
+    scale.appendChild(fr);
+    const num = document.createElement('div');
+    num.className = 'fs-num'; num.textContent = i + 1;
+    thumb.appendChild(scale); thumb.appendChild(num);
+    thumb.addEventListener('click', () => go(i));
+    fsTrack.appendChild(thumb);
+  });
+}
+
+function updateFilmstripHighlight() {
+  fsTrack.querySelectorAll('.fs-thumb').forEach((el, i) => el.classList.toggle('current', i === idx));
+  const cur = fsTrack.querySelector('.fs-thumb.current');
+  if (cur) cur.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+}
+function openFilmstrip() {
+  if (ovOpen) closeOverview();
+  fsOpen = true; buildFilmstrip();
+  filmstrip.classList.add('open'); btnFs2.classList.add('active');
+  updateFilmstripHighlight();
+}
+function closeFilmstrip() { fsOpen = false; filmstrip.classList.remove('open'); btnFs2.classList.remove('active'); }
+function toggleFilmstrip() { fsOpen ? closeFilmstrip() : openFilmstrip(); }
+
+// ── Drag and drop ─────────────────────────────────────────────────────────────
+let dragSrc = null;
+
+function clearDropIndicators() {
+  ovGrid.querySelectorAll('.drop-before,.drop-after').forEach(el => el.classList.remove('drop-before','drop-after'));
+}
+function onDragStart(e) { dragSrc = e.currentTarget; dragSrc.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragSrc.dataset.slide); }
+function onDragOver(e) {
+  e.preventDefault();
+  if (!dragSrc || e.currentTarget === dragSrc) return;
+  e.dataTransfer.dropEffect = 'move';
+  clearDropIndicators();
+  const rect = e.currentTarget.getBoundingClientRect();
+  e.currentTarget.classList.add(e.clientX < rect.left + rect.width / 2 ? 'drop-before' : 'drop-after');
+}
+function onDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drop-before','drop-after'); }
+function onDrop(e) {
+  e.preventDefault(); e.stopPropagation();
+  if (!dragSrc || e.currentTarget === dragSrc) { clearDropIndicators(); return; }
+  const target = e.currentTarget;
+  const rect = target.getBoundingClientRect();
+  const currentSlide = slides[idx];
+  ovGrid.insertBefore(dragSrc, e.clientX < rect.left + rect.width / 2 ? target : target.nextSibling);
+  clearDropIndicators();
+  slides = []; labels = [];
+  ovGrid.querySelectorAll('.ov-thumb').forEach(el => { slides.push(el.dataset.slide); labels.push(el.querySelector('.ov-thumb-name').textContent); });
+  refreshThumbCounters(); saveOrder();
+  idx = slides.indexOf(currentSlide); go(idx);
+}
+function onDragEnd() { if (dragSrc) dragSrc.classList.remove('dragging'); clearDropIndicators(); dragSrc = null; }
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+btnReset.addEventListener('click', () => {
+  const currentSlide = slides[idx];
+  slides = [...SLIDES_DEFAULT]; labels = [...LABELS_DEFAULT];
+  slides.forEach(s => { const t = ovGrid.querySelector(`[data-slide="${s}"]`); if (t) ovGrid.appendChild(t); });
+  refreshThumbCounters(); localStorage.removeItem(LS_KEY);
+  idx = slides.indexOf(currentSlide); go(idx); updateThumbHighlight();
+});
+
+// ── Keys ──────────────────────────────────────────────────────────────────────
+function handleKey(key) {
+  if (key === 'g' || key === 'G') { toggleOverview(); return; }
+  if (key === 't' || key === 'T') { toggleFilmstrip(); return; }
+  if (key === 'Escape') { if (ovOpen) { closeOverview(); return; } if (fsOpen) { closeFilmstrip(); return; } }
+  if (ovOpen) return;
+  if (key === 'ArrowRight' || key === 'ArrowDown' || key === ' ' || key === 'PageDown') go(idx + 1);
+  else if (key === 'ArrowLeft' || key === 'ArrowUp' || key === 'PageUp') go(idx - 1);
+  else if (key === 'f' || key === 'F') toggleFullscreen();
+}
+document.addEventListener('keydown', e => { if (e.metaKey || e.ctrlKey || e.altKey) return; e.preventDefault(); handleKey(e.key); });
+window.addEventListener('message', e => { if (e.data && e.data.type === 'keydown') handleKey(e.data.key); });
+
+btnPrev.addEventListener('click', () => go(idx - 1));
+btnNext.addEventListener('click', () => go(idx + 1));
+btnFs.addEventListener('click', () => toggleFullscreen());
+btnOv.addEventListener('click', () => toggleOverview());
+btnFs2.addEventListener('click', () => toggleFilmstrip());
+overview.addEventListener('click', e => { if (e.target === overview) closeOverview(); });
+
+go(idx);
+</script>
+</body>
+</html>

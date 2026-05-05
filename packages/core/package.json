@@ -1,0 +1,27 @@
+{
+  "name": "fuck-slides",
+  "version": "0.1.0",
+  "description": "A no-bullshit HTML presentation framework",
+  "bin": {
+    "fuckslides": "./bin/cli.js"
+  },
+  "main": "index.js",
+  "files": [
+    "bin/",
+    "player.html",
+    "js/",
+    "template/",
+    "index.js"
+  ],
+  "scripts": {
+    "test": "echo ok"
+  },
+  "keywords": ["presentation", "slides", "html"],
+  "license": "MIT",
+  "dependencies": {
+    "gif-encoder-2": "^1.0.5",
+    "pdf-lib": "^1.17.1",
+    "pngjs": "^7.0.0",
+    "puppeteer": "^24.42.0"
+  }
+}

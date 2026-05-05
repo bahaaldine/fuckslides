@@ -1,0 +1,5 @@
+{
+  "name": "fuckslides-repo",
+  "private": true,
+  "workspaces": ["packages/*"]
+}

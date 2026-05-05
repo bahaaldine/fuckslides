@@ -69,6 +69,13 @@ window.FUCKSLIDES_NAME   = ${nameJson};
     fs.createReadStream(filePath).pipe(res);
   });
 
+  server.on('error', e => {
+    if (e.code === 'EADDRINUSE') {
+      console.error(`\n  ❌  Port ${PORT} is already in use.\n  Run: lsof -ti :${PORT} | xargs kill -9\n`);
+    } else console.error(e);
+    process.exit(1);
+  });
+
   server.listen(PORT, () => {
     const url = `http://localhost:${PORT}`;
     console.log(`\n  fuckSlides · "${config.name || 'presentation'}"\n  ${url}\n`);

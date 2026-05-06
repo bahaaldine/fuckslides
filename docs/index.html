@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>fuckSlides — No-bullshit HTML presentations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0A0A0C;
+      --surface:     #111115;
+      --surface-2:   #18181E;
+      --border:      rgba(255,255,255,0.07);
+      --border-2:    rgba(255,255,255,0.12);
+      --text:        #EBEBF0;
+      --muted:       rgba(235,235,240,0.42);
+      --faint:       rgba(235,235,240,0.22);
+      --accent:      #FF4400;
+      --accent-dim:  rgba(255,68,0,0.12);
+      --accent-glow: rgba(255,68,0,0.22);
+      --green:       #00D68F;
+      --blue:        #4A90D9;
+      --code-bg:     #13131A;
+      --sidebar-w:   260px;
+      --header-h:    56px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── HEADER ── */
+    .site-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: var(--header-h);
+      background: rgba(10,10,12,0.88);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 28px;
+      gap: 0;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 15px; font-weight: 800; letter-spacing: -0.02em;
+      color: var(--text); text-decoration: none;
+      flex-shrink: 0;
+    }
+    .logo-mark {
+      width: 28px; height: 28px; border-radius: 7px;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; line-height: 1;
+    }
+    .logo-name { color: var(--text); }
+    .logo-name .dim { color: var(--muted); font-weight: 400; }
+    .header-gap { flex: 1; }
+    .header-links { display: flex; align-items: center; gap: 6px; }
+    .header-link {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 13px; font-weight: 500; color: var(--muted);
+      text-decoration: none; padding: 5px 10px; border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .header-link:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+    .header-link svg { width: 15px; height: 15px; }
+    .version-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 500;
+      color: var(--muted); border: 1px solid var(--border-2);
+      border-radius: 5px; padding: 2px 8px;
+      margin-left: 4px;
+    }
+
+    /* ── LAYOUT ── */
+    .layout {
+      display: flex;
+      padding-top: var(--header-h);
+      min-height: 100vh;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      position: fixed;
+      top: var(--header-h);
+      left: 0;
+      bottom: 0;
+      width: var(--sidebar-w);
+      overflow-y: auto;
+      padding: 28px 0 40px;
+      border-right: 1px solid var(--border);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.08) transparent;
+    }
+    .sidebar::-webkit-scrollbar { width: 3px; }
+    .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+    .nav-section { margin-bottom: 6px; }
+    .nav-section-label {
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--faint);
+      padding: 8px 22px 4px;
+    }
+    .nav-item {
+      display: block;
+      font-size: 13.5px; font-weight: 450;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 5px 22px;
+      border-left: 2px solid transparent;
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
+      margin: 0 0 1px;
+    }
+    .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+    .nav-item.active {
+      color: var(--text); font-weight: 600;
+      border-left-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    /* ── MAIN CONTENT ── */
+    .content {
+      margin-left: var(--sidebar-w);
+      flex: 1; min-width: 0;
+      max-width: 820px;
+      padding: 52px 64px 100px;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      margin-bottom: 60px;
+      padding-bottom: 48px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid rgba(255,68,0,0.25);
+      border-radius: 5px; padding: 3px 10px;
+      margin-bottom: 20px;
+    }
+    .hero-eyebrow::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); display: inline-block; }
+    .hero-title {
+      font-size: 48px; font-weight: 900;
+      letter-spacing: -0.04em; line-height: 1.1;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+    .hero-title .accent { color: var(--accent); }
+    .hero-subtitle {
+      font-size: 17px; font-weight: 400;
+      color: var(--muted); line-height: 1.65;
+      max-width: 560px;
+      margin-bottom: 28px;
+    }
+    .hero-subtitle strong { color: var(--text); font-weight: 600; }
+    .hero-install {
+      display: inline-flex; align-items: center; gap: 0;
+      background: var(--code-bg);
+      border: 1px solid var(--border-2);
+      border-radius: 9px; overflow: hidden;
+    }
+    .hero-install-cmd {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px; font-weight: 500;
+      color: var(--green); padding: 10px 18px;
+    }
+    .hero-install-prompt { color: var(--faint); margin-right: 8px; }
+    .copy-btn {
+      background: rgba(255,255,255,0.05);
+      border: none; border-left: 1px solid var(--border);
+      color: var(--muted); padding: 10px 14px;
+      cursor: pointer; font-size: 13px;
+      transition: background 0.15s, color 0.15s;
+      font-family: inherit;
+    }
+    .copy-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+    .copy-btn.copied { color: var(--green); }
+
+    /* ── SECTIONS ── */
+    .doc-section { margin-bottom: 64px; }
+    .doc-section:last-child { margin-bottom: 0; }
+
+    h2 {
+      font-size: 26px; font-weight: 800;
+      letter-spacing: -0.03em; color: #fff;
+      margin-bottom: 12px;
+      padding-top: 8px;
+    }
+    h3 {
+      font-size: 18px; font-weight: 700;
+      letter-spacing: -0.02em; color: var(--text);
+      margin: 32px 0 10px;
+    }
+    h3:first-child { margin-top: 0; }
+
+    p { color: var(--muted); margin-bottom: 14px; }
+    p:last-child { margin-bottom: 0; }
+    p strong { color: var(--text); font-weight: 600; }
+    p a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(255,68,0,0.3); transition: border-color 0.15s; }
+    p a:hover { border-color: var(--accent); }
+
+    /* ── CALLOUTS ── */
+    .callout {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border-2);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 13px 16px;
+      margin: 20px 0;
+      font-size: 13.5px; color: var(--muted); line-height: 1.6;
+    }
+    .callout.tip { border-left-color: var(--green); }
+    .callout.info { border-left-color: var(--blue); }
+    .callout-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .callout code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 3px; color: var(--text); }
+
+    /* ── CODE ── */
+    .code-block {
+      margin: 18px 0;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      background: var(--code-bg);
+    }
+    .code-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 14px 8px 16px;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid var(--border);
+    }
+    .code-filename {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 500;
+      color: var(--muted); letter-spacing: 0.02em;
+    }
+    .code-lang {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; font-weight: 500;
+      color: var(--faint); letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    pre {
+      padding: 18px 20px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; line-height: 1.7;
+      color: #C9D1D9;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.08) transparent;
+    }
+    pre::-webkit-scrollbar { height: 3px; }
+    pre::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+    .code-block pre { padding: 18px 20px; }
+
+    /* Token colors */
+    .kw  { color: #FF7B72; } /* keywords */
+    .str { color: #A5D6FF; } /* strings */
+    .cm  { color: rgba(255,255,255,0.28); font-style: italic; } /* comments */
+    .fn  { color: #D2A8FF; } /* functions */
+    .num { color: #F0883E; } /* numbers */
+    .key { color: #79C0FF; } /* object keys */
+    .pun { color: rgba(255,255,255,0.55); } /* punctuation */
+    .clr { color: var(--green); } /* terminal green */
+    .dim { color: rgba(255,255,255,0.35); } /* dimmed */
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px; font-weight: 500;
+      background: rgba(255,255,255,0.07);
+      color: #FFB347;
+      padding: 2px 6px; border-radius: 4px;
+    }
+
+    /* ── TABLES ── */
+    .table-wrap { overflow-x: auto; margin: 18px 0; border-radius: 9px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th {
+      text-align: left; font-size: 11px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--faint);
+      padding: 10px 16px;
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 16px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    td code { font-size: 11.5px; }
+    td strong { color: var(--text); }
+
+    /* ── KBD KEYS ── */
+    kbd {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 600;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-bottom: 2px solid rgba(255,255,255,0.18);
+      border-radius: 5px;
+      padding: 2px 7px;
+      min-width: 26px; text-align: center;
+      line-height: 1.5;
+    }
+
+    /* ── DIVIDER ── */
+    .divider { height: 1px; background: var(--border); margin: 48px 0; }
+
+    /* ── FEATURE GRID ── */
+    .feature-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px; margin: 20px 0;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .feature-card-icon { font-size: 20px; margin-bottom: 8px; }
+    .feature-card-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .feature-card-desc { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+
+    /* ── STEP LIST ── */
+    .steps { display: flex; flex-direction: column; gap: 0; margin: 20px 0; }
+    .step {
+      display: flex; gap: 16px; align-items: flex-start;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+      background: var(--accent-dim); border: 1px solid rgba(255,68,0,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; color: var(--accent);
+      margin-top: 2px;
+    }
+    .step-body { flex: 1; }
+    .step-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+    .step-desc { font-size: 13px; color: var(--muted); }
+    .step-desc code { font-size: 11.5px; }
+
+    /* ── ANTI-SLIDE MANIFESTO ── */
+    .manifesto {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 32px;
+      margin: 28px 0;
+    }
+    .manifesto-line {
+      font-size: 15px; color: var(--muted); line-height: 2;
+      display: flex; align-items: baseline; gap: 10px;
+    }
+    .manifesto-line::before { content: '—'; color: var(--faint); flex-shrink: 0; }
+    .manifesto-line .strike { text-decoration: line-through; color: var(--faint); }
+    .manifesto-line .good { color: var(--text); font-weight: 600; }
+
+    /* ── PROTOCOL BOX ── */
+    .protocol-box {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      margin: 18px 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 2;
+    }
+    .protocol-box .label { color: var(--faint); margin-right: 8px; user-select: none; }
+    .protocol-box .msg-send { color: var(--green); }
+    .protocol-box .msg-recv { color: var(--blue); }
+    .protocol-box .msg-note { color: var(--faint); font-style: italic; }
+
+    /* ── SCROLLSPY ── */
+    @media (max-width: 960px) {
+      .sidebar { display: none; }
+      .content { margin-left: 0; padding: 40px 28px 80px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ HEADER ══════════ -->
+<header class="site-header">
+  <a href="#" class="logo">
+    <div class="logo-mark">⚡</div>
+    <span class="logo-name">fuck<span class="dim">Slides</span></span>
+  </a>
+  <span class="version-badge">v0.1.0</span>
+  <div class="header-gap"></div>
+  <nav class="header-links">
+    <a href="https://github.com/baha/fuckslides" class="header-link" target="_blank">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      GitHub
+    </a>
+  </nav>
+</header>
+
+<!-- ══════════ LAYOUT ══════════ -->
+<div class="layout">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="sidebar">
+
+    <div class="nav-section">
+      <div class="nav-section-label">Getting Started</div>
+      <a href="#what-is-this" class="nav-item active">What is this?</a>
+      <a href="#install" class="nav-item">Install</a>
+      <a href="#quickstart" class="nav-item">Quick Start</a>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Your Slides</div>
+      <a href="#project-structure" class="nav-item">Project Structure</a>
+      <a href="#writing-slides" class="nav-item">Writing Slides</a>
+      <a href="#builtins" class="nav-item">Built-ins</a>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Configuration</div>
+      <a href="#config" class="nav-item">fuckslides.config.js</a>
+      <a href="#pdf-overrides" class="nav-item">PDF Overrides</a>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Commands</div>
+      <a href="#cmd-serve" class="nav-item">serve</a>
+      <a href="#cmd-pdf" class="nav-item">pdf</a>
+      <a href="#cmd-gif" class="nav-item">gif</a>
+      <a href="#cmd-create" class="nav-item">create</a>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Player</div>
+      <a href="#keyboard" class="nav-item">Keyboard Shortcuts</a>
+      <a href="#overview" class="nav-item">Overview</a>
+      <a href="#disable-slides" class="nav-item">Disable Slides</a>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Advanced</div>
+      <a href="#nav-lock" class="nav-item">Nav-lock Protocol</a>
+      <a href="#standalone" class="nav-item">Standalone Mode</a>
+    </div>
+
+  </aside>
+
+  <!-- ══ CONTENT ══ -->
+  <main class="content">
+
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-eyebrow">No-bullshit HTML presentations</div>
+      <h1 class="hero-title">Your slides are <span class="accent">HTML.</span><br>Finally.</h1>
+      <p class="hero-subtitle">
+        Every presentation tool gives you a box to check. fuckSlides gives you a blank HTML file.<br>
+        <strong>Your CSS. Your animations. Your design system. Your code.</strong>
+      </p>
+      <div class="hero-install">
+        <div class="hero-install-cmd">
+          <span class="hero-install-prompt">$</span> npm install -g fuck-slides
+        </div>
+        <button class="copy-btn" onclick="copyInstall(this)">copy</button>
+      </div>
+    </div>
+
+
+    <!-- ══ WHAT IS THIS ══ -->
+    <section class="doc-section" id="what-is-this">
+      <h2>What is this?</h2>
+
+      <div class="manifesto">
+        <div class="manifesto-line"><span class="strike">Drag-and-drop templates</span> → <span class="good">Write HTML</span></div>
+        <div class="manifesto-line"><span class="strike">Proprietary animation timelines</span> → <span class="good">CSS keyframes</span></div>
+        <div class="manifesto-line"><span class="strike">Export to PDF praying it doesn't break</span> → <span class="good">Puppeteer. It works.</span></div>
+        <div class="manifesto-line"><span class="strike">Lock-in to a platform</span> → <span class="good">It's a file. Open it in a browser.</span></div>
+        <div class="manifesto-line"><span class="strike">Themes that look like everyone else's</span> → <span class="good">It's your CSS. You decide.</span></div>
+      </div>
+
+      <p>fuckSlides is a <strong>presentation shell</strong>. It handles the player, keyboard navigation, overview, PDF export, and GIF export. Your slides are plain <code>.html</code> files — no special syntax, no runtime DSL, no framework opinions.</p>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-card-icon">⌨️</div>
+          <div class="feature-card-title">Arrow-key navigation</div>
+          <div class="feature-card-desc">Player forwards keys. Slides can lock navigation for demo sequences.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">📄</div>
+          <div class="feature-card-title">PDF & GIF export</div>
+          <div class="feature-card-desc">Puppeteer-powered. Per-slide overrides for animation state.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🗂️</div>
+          <div class="feature-card-title">Slide overview</div>
+          <div class="feature-card-desc">Live thumbnails, drag-to-reorder, disable slides mid-presentation.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🔌</div>
+          <div class="feature-card-title">Zero lock-in</div>
+          <div class="feature-card-desc">Every slide works standalone in a browser. No server required to view.</div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ══ INSTALL ══ -->
+    <section class="doc-section" id="install">
+      <h2>Install</h2>
+
+      <p>Install globally to get the <code>fuckslides</code> command:</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> npm install -g fuck-slides</pre>
+      </div>
+
+      <p>Or run without installing:</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> npx fuck-slides create my-talk</pre>
+      </div>
+    </section>
+
+
+    <!-- ══ QUICKSTART ══ -->
+    <section class="doc-section" id="quickstart">
+      <h2>Quick Start</h2>
+
+      <p>From zero to presenting in four commands:</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides create my-talk
+<span class="clr">$</span> cd my-talk
+<span class="clr">$</span> npm install
+<span class="clr">$</span> fuckslides serve</pre>
+      </div>
+
+      <p>A browser opens at <code>http://localhost:3000</code> with your presentation in the player. Start editing <code>slides/index.html</code> and refresh.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Scaffold</div>
+            <div class="step-desc"><code>fuckslides create my-talk</code> — creates the project structure with a starter slide and config.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Edit</div>
+            <div class="step-desc">Open <code>slides/index.html</code> in your editor. Write HTML. Add slides. Update <code>fuckslides.config.js</code> with the new filenames.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Present</div>
+            <div class="step-desc"><code>fuckslides serve</code> — opens the player. Use arrow keys to navigate. Press <kbd>G</kbd> for the overview.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">Export</div>
+            <div class="step-desc"><code>fuckslides pdf</code> — produces a single PDF. All slides, all states, properly captured.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ══ PROJECT STRUCTURE ══ -->
+    <section class="doc-section" id="project-structure">
+      <h2>Project Structure</h2>
+
+      <div class="code-block">
+        <pre><span class="dim">my-talk/</span>
+  <span class="dim">├─</span> <span class="key">slides/</span>
+  <span class="dim">│   ├─</span> index.html          <span class="cm">← your first slide</span>
+  <span class="dim">│   ├─</span> problem.html
+  <span class="dim">│   ├─</span> solution.html
+  <span class="dim">│   └─</span> thank-you.html
+  <span class="dim">├─</span> <span class="key">fuckslides.config.js</span>  <span class="cm">← slide manifest + options</span>
+  <span class="dim">└─</span> <span class="key">package.json</span></pre>
+      </div>
+
+      <p>That's the whole project. No <code>src/</code>, no <code>dist/</code>, no build step. Slides live in <code>slides/</code> and the config tells fuckSlides the order.</p>
+    </section>
+
+
+    <!-- ══ WRITING SLIDES ══ -->
+    <section class="doc-section" id="writing-slides">
+      <h2>Writing Slides</h2>
+
+      <p>Each slide is a standalone HTML file. The only requirement is including the fuckSlides runtime at the bottom of <code>&lt;body&gt;</code>:</p>
+
+      <div class="code-block">
+        <pre><span class="str">&lt;script src=</span><span class="str">"/js/fuckslides.js"</span><span class="str">&gt;&lt;/script&gt;</span></pre>
+      </div>
+
+      <p>Here's a minimal slide that actually looks good:</p>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">slides/index.html</span>
+          <span class="code-lang">HTML</span>
+        </div>
+        <pre><span class="pun">&lt;!</span><span class="kw">DOCTYPE</span> <span class="fn">html</span><span class="pun">&gt;</span>
+<span class="pun">&lt;</span><span class="fn">html</span> <span class="key">lang</span><span class="pun">=</span><span class="str">"en"</span><span class="pun">&gt;</span>
+<span class="pun">&lt;</span><span class="fn">head</span><span class="pun">&gt;</span>
+  <span class="pun">&lt;</span><span class="fn">meta</span> <span class="key">charset</span><span class="pun">=</span><span class="str">"UTF-8"</span><span class="pun">&gt;</span>
+  <span class="pun">&lt;</span><span class="fn">style</span><span class="pun">&gt;</span>
+    <span class="kw">html</span>, <span class="kw">body</span> {
+      <span class="key">width</span>: <span class="num">100%</span>; <span class="key">height</span>: <span class="num">100vh</span>; <span class="key">overflow</span>: <span class="num">hidden</span>;
+      <span class="key">display</span>: <span class="num">flex</span>; <span class="key">align-items</span>: <span class="num">center</span>; <span class="key">justify-content</span>: <span class="num">center</span>;
+      <span class="key">background</span>: <span class="str">#0A1520</span>; <span class="key">color</span>: <span class="str">#fff</span>;
+      <span class="key">font-family</span>: <span class="str">'Inter'</span>, <span class="str">sans-serif</span>;
+    }
+    <span class="kw">h1</span> { <span class="key">font-size</span>: <span class="fn">clamp</span>(<span class="num">3rem</span>, <span class="num">7vw</span>, <span class="num">8rem</span>); <span class="key">font-weight</span>: <span class="num">900</span>; }
+  <span class="pun">&lt;/</span><span class="fn">style</span><span class="pun">&gt;</span>
+<span class="pun">&lt;/</span><span class="fn">head</span><span class="pun">&gt;</span>
+<span class="pun">&lt;</span><span class="fn">body</span><span class="pun">&gt;</span>
+  <span class="pun">&lt;</span><span class="fn">h1</span><span class="pun">&gt;</span>Hello, world.<span class="pun">&lt;/</span><span class="fn">h1</span><span class="pun">&gt;</span>
+  <span class="pun">&lt;</span><span class="fn">script</span> <span class="key">src</span><span class="pun">=</span><span class="str">"/js/fuckslides.js"</span><span class="pun">&gt;&lt;/</span><span class="fn">script</span><span class="pun">&gt;</span>
+<span class="pun">&lt;/</span><span class="fn">body</span><span class="pun">&gt;</span>
+<span class="pun">&lt;/</span><span class="fn">html</span><span class="pun">&gt;</span></pre>
+      </div>
+
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <span>Slides are designed for <strong>1280×720</strong> (16:9). Use <code>clamp()</code>, <code>vw</code>, and <code>vh</code> units to keep layouts fluid — they'll scale correctly in the player regardless of screen size.</span>
+      </div>
+    </section>
+
+
+    <!-- ══ BUILT-INS ══ -->
+    <section class="doc-section" id="builtins">
+      <h2>Built-ins</h2>
+      <p>Including <code>/js/fuckslides.js</code> gives you two conveniences for free.</p>
+
+      <h3>Scroll reveals</h3>
+      <p>Add <code>.reveal</code> to any element. It fades in when it enters the viewport — and in PDF export, all reveals are forced visible automatically.</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-filename">your-slide.html</span><span class="code-lang">HTML</span></div>
+        <pre><span class="pun">&lt;</span><span class="fn">p</span> <span class="key">class</span><span class="pun">=</span><span class="str">"reveal"</span><span class="pun">&gt;</span>This appears on scroll.<span class="pun">&lt;/</span><span class="fn">p</span><span class="pun">&gt;</span></pre>
+      </div>
+
+      <p>Add the transition CSS to your slide:</p>
+
+      <div class="code-block">
+        <pre><span class="pun">.</span><span class="fn">reveal</span> {
+  <span class="key">opacity</span>: <span class="num">0</span>;
+  <span class="key">transform</span>: <span class="fn">translateY</span>(<span class="num">16px</span>);
+  <span class="key">transition</span>: <span class="key">opacity</span> <span class="num">0.5s</span> <span class="num">ease</span>, <span class="key">transform</span> <span class="num">0.5s</span> <span class="num">ease</span>;
+}
+<span class="pun">.</span><span class="fn">reveal</span><span class="pun">.</span><span class="fn">visible</span> {
+  <span class="key">opacity</span>: <span class="num">1</span>;
+  <span class="key">transform</span>: <span class="fn">none</span>;
+}</pre>
+      </div>
+
+      <h3>Animated counters</h3>
+      <p>Add <code>data-target</code> to any element. The number counts up when it enters the viewport.</p>
+
+      <div class="code-block">
+        <pre><span class="pun">&lt;</span><span class="fn">span</span> <span class="key">data-target</span><span class="pun">=</span><span class="str">"30"</span> <span class="key">data-suffix</span><span class="pun">=</span><span class="str">"×"</span><span class="pun">&gt;&lt;/</span><span class="fn">span</span><span class="pun">&gt;</span>
+<span class="pun">&lt;</span><span class="fn">span</span> <span class="key">data-target</span><span class="pun">=</span><span class="str">"99.9"</span> <span class="key">data-suffix</span><span class="pun">=</span><span class="str">"%"</span> <span class="key">data-prefix</span><span class="pun">=</span><span class="str">"~"</span><span class="pun">&gt;&lt;/</span><span class="fn">span</span><span class="pun">&gt;</span></pre>
+      </div>
+
+      <p>Integers animate as whole numbers. Floats animate to one decimal place.</p>
+    </section>
+
+
+    <!-- ══ CONFIG ══ -->
+    <section class="doc-section" id="config">
+      <h2>fuckslides.config.js</h2>
+
+      <p>One config file. Lives at the root of your presentation directory.</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-filename">fuckslides.config.js</span><span class="code-lang">JS</span></div>
+        <pre><span class="kw">module</span><span class="pun">.</span><span class="fn">exports</span> <span class="pun">=</span> <span class="pun">{</span>
+
+  <span class="cm">// Presentation name — used as PDF filename and player title</span>
+  <span class="key">name</span><span class="pun">:</span> <span class="str">'my-talk'</span><span class="pun">,</span>
+
+  <span class="cm">// Slides directory (default: 'slides')</span>
+  <span class="key">slidesDir</span><span class="pun">:</span> <span class="str">'slides'</span><span class="pun">,</span>
+
+  <span class="cm">// Ordered list of slide filenames</span>
+  <span class="key">slides</span><span class="pun">: [</span>
+    <span class="str">'cover.html'</span><span class="pun">,</span>
+    <span class="str">'problem.html'</span><span class="pun">,</span>
+    <span class="str">'solution.html'</span><span class="pun">,</span>
+    <span class="str">'demo.html'</span><span class="pun">,</span>
+    <span class="str">'thank-you.html'</span><span class="pun">,</span>
+  <span class="pun">],</span>
+
+  <span class="cm">// Labels shown in the overview panel — must match slides length</span>
+  <span class="key">labels</span><span class="pun">: [</span>
+    <span class="str">'Cover'</span><span class="pun">,</span>
+    <span class="str">'Problem'</span><span class="pun">,</span>
+    <span class="str">'Solution'</span><span class="pun">,</span>
+    <span class="str">'Demo'</span><span class="pun">,</span>
+    <span class="str">'Thank You'</span><span class="pun">,</span>
+  <span class="pun">],</span>
+
+  <span class="cm">// Slides to skip during navigation (still visible in overview)</span>
+  <span class="key">disabled</span><span class="pun">: [</span>
+    <span class="str">'backup-slide.html'</span><span class="pun">,</span>
+  <span class="pun">],</span>
+
+  <span class="cm">// Dev server port (default: 3000)</span>
+  <span class="key">port</span><span class="pun">:</span> <span class="num">3000</span><span class="pun">,</span>
+
+<span class="pun">};</span></pre>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>name</code></td><td>string</td><td>Presentation title. Used as PDF filename.</td></tr>
+            <tr><td><code>slides</code></td><td>string[]</td><td>Ordered slide filenames relative to <code>slidesDir</code>.</td></tr>
+            <tr><td><code>labels</code></td><td>string[]</td><td>Human-readable names shown in the overview panel.</td></tr>
+            <tr><td><code>disabled</code></td><td>string[]</td><td>Slides to skip in navigation. Still toggleable in overview.</td></tr>
+            <tr><td><code>slidesDir</code></td><td>string</td><td>Slides directory. Defaults to <code>"slides"</code>.</td></tr>
+            <tr><td><code>port</code></td><td>number</td><td>Dev server port. Defaults to <code>3000</code>.</td></tr>
+            <tr><td><code>pdfOverrides</code></td><td>object</td><td>Per-slide PDF capture overrides. <a href="#pdf-overrides">See below.</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+
+    <!-- ══ PDF OVERRIDES ══ -->
+    <section class="doc-section" id="pdf-overrides">
+      <h2>PDF Overrides</h2>
+
+      <p>Some slides have JS-driven animations that need special handling before Puppeteer captures them. Define per-slide overrides in your config:</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-filename">fuckslides.config.js</span><span class="code-lang">JS</span></div>
+        <pre><span class="kw">module</span><span class="pun">.</span><span class="fn">exports</span> <span class="pun">=</span> <span class="pun">{</span>
+  <span class="cm">// ...</span>
+  <span class="key">pdfOverrides</span><span class="pun">: {</span>
+
+    <span class="cm">// Wait for a JS animation to reach its end state</span>
+    <span class="str">'animated-counter.html'</span><span class="pun">: {</span>
+      <span class="key">wait</span><span class="pun">:</span> <span class="num">5000</span><span class="pun">,</span>  <span class="cm">// extra ms on top of the default 2000ms</span>
+    <span class="pun">},</span>
+
+    <span class="cm">// Inject JS to reach the desired visual state before capture</span>
+    <span class="str">'step-reveal.html'</span><span class="pun">: {</span>
+      <span class="key">extra</span><span class="pun">:</span> <span class="str">`
+        document.querySelectorAll('.step').forEach(el =&gt; {
+          el.classList.add('visible');
+        });
+      `</span><span class="pun">,</span>
+      <span class="key">wait</span><span class="pun">:</span> <span class="num">300</span><span class="pun">,</span>
+    <span class="pun">},</span>
+
+  <span class="pun">},</span>
+<span class="pun">};</span></pre>
+      </div>
+
+      <p>The <code>extra</code> script runs after fuckSlides has already called <code>document.getAnimations().forEach(a =&gt; a.finish())</code> and forced all <code>.reveal</code> elements visible. Use it for anything your slide-specific JS controls.</p>
+    </section>
+
+
+    <!-- ══ COMMANDS ══ -->
+    <section class="doc-section" id="cmd-serve">
+      <h2>Commands</h2>
+      <h3>fuckslides serve</h3>
+      <p>Starts the dev server and opens the player in a browser.</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides serve
+
+  fuckSlides · "my-talk"
+  http://localhost:3000</pre>
+      </div>
+
+      <p>Slides are served from your <code>slides/</code> directory. The slide manifest (<code>window.FUCKSLIDES_SLIDES</code>) is injected into every HTML file automatically — your slides don't need to know about each other.</p>
+    </section>
+
+    <section class="doc-section" id="cmd-pdf">
+      <h3>fuckslides pdf</h3>
+      <p>Exports all slides to a single PDF using Puppeteer.</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides pdf
+<span class="dim">→ my-talk.pdf</span></pre>
+      </div>
+
+      <p>Before capturing each slide, fuckSlides automatically:</p>
+      <ul style="margin: 10px 0 14px 22px; color: var(--muted); display: flex; flex-direction: column; gap: 5px; font-size: 14px;">
+        <li>Finishes all running CSS animations</li>
+        <li>Forces all <code>.reveal</code> elements visible</li>
+        <li>Runs your <code>pdfOverrides.extra</code> script (if defined)</li>
+        <li>Waits <code>pdfOverrides.wait</code> extra ms (if defined)</li>
+      </ul>
+    </section>
+
+    <section class="doc-section" id="cmd-gif">
+      <h3>fuckslides gif &lt;slide&gt;</h3>
+      <p>Exports a single slide as an animated GIF at 2× retina quality.</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides gif demo.html
+<span class="dim">→ demo.gif</span></pre>
+      </div>
+
+      <p>Captures at <strong>2560×1440</strong>, <strong>20fps</strong>, <strong>13 seconds</strong> via Puppeteer, then encodes with gifski for maximum quality. Requires gifski:</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> brew install gifski  <span class="cm"># macOS</span></pre>
+      </div>
+    </section>
+
+    <section class="doc-section" id="cmd-create">
+      <h3>fuckslides create &lt;name&gt;</h3>
+      <p>Scaffolds a new presentation directory with a starter slide and config.</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides create my-talk</pre>
+      </div>
+
+      <p>Creates <code>my-talk/</code> with <code>slides/index.html</code>, <code>fuckslides.config.js</code>, and <code>package.json</code>.</p>
+    </section>
+
+
+    <!-- ══ KEYBOARD ══ -->
+    <section class="doc-section" id="keyboard">
+      <h2>Player</h2>
+      <h3>Keyboard Shortcuts</h3>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Action</th><th>Keys</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Next slide</strong></td><td><kbd>→</kbd> <kbd>↓</kbd> <kbd>Space</kbd> <kbd>PageDown</kbd></td></tr>
+            <tr><td><strong>Previous slide</strong></td><td><kbd>←</kbd> <kbd>↑</kbd> <kbd>PageUp</kbd></td></tr>
+            <tr><td><strong>Slide overview</strong></td><td><kbd>G</kbd></td></tr>
+            <tr><td><strong>Filmstrip</strong></td><td><kbd>T</kbd></td></tr>
+            <tr><td><strong>Fullscreen</strong></td><td><kbd>F</kbd></td></tr>
+            <tr><td><strong>Close overlay</strong></td><td><kbd>Esc</kbd></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout info">
+        <span class="callout-icon">🎯</span>
+        <span>Presenter clickers send <code>PageDown</code> and <code>PageUp</code> — both are wired up and work out of the box.</span>
+      </div>
+    </section>
+
+    <section class="doc-section" id="overview">
+      <h3>Slide Overview</h3>
+      <p>Press <kbd>G</kbd> to open a full-screen grid of all slides as live thumbnails. From the overview you can:</p>
+      <ul style="margin: 10px 0 0 22px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; font-size: 14px;">
+        <li><strong style="color:var(--text)">Jump</strong> to any slide by clicking its thumbnail</li>
+        <li><strong style="color:var(--text)">Reorder</strong> slides by dragging — order is saved instantly to <code>fuckslides.config.js</code></li>
+        <li><strong style="color:var(--text)">Disable</strong> individual slides with the ⊘ toggle (see below)</li>
+      </ul>
+    </section>
+
+    <section class="doc-section" id="disable-slides">
+      <h3>Disable Slides</h3>
+      <p>In the overview, every slide has a ⊘ button. Toggle it to disable a slide: navigation skips it, the thumbnail greys out, and the change is written to <code>fuckslides.config.js</code> via the <code>disabled</code> array.</p>
+      <p>Disabled slides are never removed — they're just skipped during <kbd>→</kbd> navigation. You can re-enable them at any time from the overview.</p>
+
+      <div class="callout">
+        <span class="callout-icon">🎭</span>
+        <span>This is designed for live presentations where you want to conditionally skip backup slides or time-dependent content without having to edit the config mid-talk.</span>
+      </div>
+    </section>
+
+
+    <!-- ══ NAV-LOCK ══ -->
+    <section class="doc-section" id="nav-lock">
+      <h2>Nav-lock Protocol</h2>
+
+      <p>By default, arrow keys advance to the next slide. But some slides need to control their own navigation — a multi-step demo, an animated sequence, a live walkthrough. The nav-lock protocol gives slides that control.</p>
+
+      <p>When a slide sends <code>nav-lock</code>, the player holds navigation and forwards all arrow keys into the slide as <code>player-keydown</code> messages. The slide handles them, advances its own steps, and sends <code>nav-unlock</code> when it's done.</p>
+
+      <div class="protocol-box">
+        <div><span class="label">slide →</span> <span class="msg-send">postMessage({ type: 'nav-lock' })</span> <span class="msg-note">// on load, lock the player</span></div>
+        <div><span class="label">player →</span> <span class="msg-recv">postMessage({ type: 'player-keydown', key: 'ArrowRight' })</span></div>
+        <div><span class="label">slide →</span> <span class="msg-note">// handles key, advances internal step</span></div>
+        <div><span class="label">player →</span> <span class="msg-recv">postMessage({ type: 'player-keydown', key: 'ArrowRight' })</span></div>
+        <div><span class="label">slide →</span> <span class="msg-note">// handles key, advances internal step</span></div>
+        <div><span class="label">slide →</span> <span class="msg-send">postMessage({ type: 'nav-unlock' })</span> <span class="msg-note">// steps exhausted, unlock</span></div>
+        <div><span class="label">player →</span> <span class="msg-note">// next → now advances to the next slide</span></div>
+      </div>
+
+      <p>Implementing it in a slide:</p>
+
+      <div class="code-block">
+        <pre><span class="pun">(</span><span class="kw">function</span><span class="pun">() {</span>
+  <span class="kw">var</span> <span class="fn">step</span> <span class="pun">=</span> <span class="num">0</span><span class="pun">;</span>
+  <span class="kw">var</span> <span class="fn">TOTAL</span> <span class="pun">=</span> <span class="num">3</span><span class="pun">;</span>
+  <span class="kw">var</span> <span class="fn">FWD</span>  <span class="pun">= [</span><span class="str">'ArrowRight'</span><span class="pun">,</span> <span class="str">'Space'</span><span class="pun">,</span> <span class="str">'PageDown'</span><span class="pun">];</span>
+  <span class="kw">var</span> <span class="fn">BACK</span> <span class="pun">= [</span><span class="str">'ArrowLeft'</span><span class="pun">,</span>  <span class="str">'PageUp'</span><span class="pun">];</span>
+
+  <span class="kw">function</span> <span class="fn">handleKey</span><span class="pun">(</span>key<span class="pun">) {</span>
+    <span class="kw">if</span> <span class="pun">(</span>FWD<span class="pun">.</span><span class="fn">indexOf</span><span class="pun">(</span>key<span class="pun">) !== -</span><span class="num">1</span> <span class="pun">&amp;&amp;</span> step <span class="pun">&lt;</span> TOTAL<span class="pun">) {</span>
+      step<span class="pun">++;</span>
+      <span class="fn">showStep</span><span class="pun">(</span>step<span class="pun">);</span>
+      <span class="kw">if</span> <span class="pun">(</span>step <span class="pun">&gt;=</span> TOTAL<span class="pun">)</span>
+        <span class="fn">window</span><span class="pun">.</span>parent<span class="pun">.</span><span class="fn">postMessage</span><span class="pun">({</span> <span class="key">type</span><span class="pun">:</span> <span class="str">'nav-unlock'</span> <span class="pun">},</span> <span class="str">'*'</span><span class="pun">);</span>
+    <span class="pun">}</span>
+  <span class="pun">}</span>
+
+  <span class="cm">// Receive forwarded keys from the player</span>
+  <span class="fn">window</span><span class="pun">.</span><span class="fn">addEventListener</span><span class="pun">(</span><span class="str">'message'</span><span class="pun">,</span> <span class="kw">function</span><span class="pun">(</span>e<span class="pun">) {</span>
+    <span class="kw">if</span> <span class="pun">(</span>e<span class="pun">.</span>data<span class="pun">?.</span>type <span class="pun">===</span> <span class="str">'player-keydown'</span><span class="pun">)</span> <span class="fn">handleKey</span><span class="pun">(</span>e<span class="pun">.</span>data<span class="pun">.</span>key<span class="pun">);</span>
+  <span class="pun">});</span>
+
+  <span class="cm">// Lock the player on load</span>
+  <span class="kw">if</span> <span class="pun">(</span>window<span class="pun">.</span>parent <span class="pun">!==</span> window<span class="pun">)</span>
+    window<span class="pun">.</span>parent<span class="pun">.</span><span class="fn">postMessage</span><span class="pun">({</span> <span class="key">type</span><span class="pun">:</span> <span class="str">'nav-lock'</span> <span class="pun">},</span> <span class="str">'*'</span><span class="pun">);</span>
+<span class="pun">})();</span></pre>
+      </div>
+
+      <div class="callout tip">
+        <span class="callout-icon">↩️</span>
+        <span>For backwards navigation, re-lock when the user goes back from step TOTAL: <code>if (step >= TOTAL) postMessage({ type: 'nav-lock' })</code> before decrementing.</span>
+      </div>
+    </section>
+
+
+    <!-- ══ STANDALONE ══ -->
+    <section class="doc-section" id="standalone">
+      <h2>Standalone Mode</h2>
+
+      <p>Every slide works without the player. Open any <code>.html</code> file directly in a browser — fuckSlides detects it's not running inside an iframe and injects a minimal nav pill in the bottom-right corner.</p>
+
+      <p>The pill shows <code>current / total</code>, back/forward arrows, and a fullscreen button. It reads the slide manifest from <code>window.FUCKSLIDES_SLIDES</code> (which the server injects), falling back to single-slide navigation when opened as a file.</p>
+
+      <div class="callout info">
+        <span class="callout-icon">📎</span>
+        <span>This means you can email a single slide as an HTML attachment and the recipient can open it in any browser — no server, no install, no player required.</span>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="doc-section">
+      <p style="font-size:13px; color: var(--faint); text-align: center;">
+        fuckSlides · MIT License · Made with unreasonable conviction that slides should just be HTML
+      </p>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // Copy install command
+  function copyInstall(btn) {
+    navigator.clipboard.writeText('npm install -g fuck-slides').then(function() {
+      btn.textContent = 'copied!';
+      btn.classList.add('copied');
+      setTimeout(function() {
+        btn.textContent = 'copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  // Scrollspy
+  var sections = document.querySelectorAll('[id]');
+  var navItems = document.querySelectorAll('.nav-item');
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        var id = entry.target.id;
+        navItems.forEach(function(item) {
+          item.classList.toggle('active', item.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(function(s) { observer.observe(s); });
+</script>
+</body>
+</html>

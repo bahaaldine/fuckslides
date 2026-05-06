@@ -37,8 +37,34 @@ window.FUCKSLIDES_NAME   = ${nameJson};
     return html.includes('</head>') ? html.replace('</head>', tag + '\n</head>') : html;
   }
 
+  const cfgPath = path.join(cwd, 'fuckslides.config.js');
+
   const server = http.createServer((req, res) => {
     let urlPath = req.url.split('?')[0];
+
+    if (req.method === 'POST' && urlPath === '/api/save-order') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const { slides: newSlides, labels: newLabels } = JSON.parse(body);
+          let src = fs.readFileSync(cfgPath, 'utf8');
+          const fmt = arr => '[\n    ' + arr.map(s => `'${s.replace(/'/g, "\\'")}'`).join(',\n    ') + ',\n  ]';
+          src = src.replace(/slides:\s*\[[^\]]*\]/, `slides: ${fmt(newSlides)}`);
+          src = src.replace(/labels:\s*\[[^\]]*\]/, `labels: ${fmt(newLabels)}`);
+          fs.writeFileSync(cfgPath, src, 'utf8');
+          config.slides = newSlides;
+          config.labels  = newLabels;
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
     if (urlPath === '/' || urlPath === '/player.html') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(playerHtml);

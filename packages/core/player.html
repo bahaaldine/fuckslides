@@ -8,7 +8,7 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100vh; overflow: hidden; background: #22242C; }
 
-    #slide-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: none; display: block; }
+    #slide-frame { position: absolute; width: 1280px; height: 720px; border: none; display: block; transform-origin: top left; }
 
     .preso-nav {
       position: fixed; bottom: 1.5rem; right: 1.5rem;
@@ -78,6 +78,8 @@
     .ov-reset { font-family: 'Inter', -apple-system, sans-serif; font-size: 0.62rem; font-weight: 600; letter-spacing: 0.06em; color: rgba(56,189,248,0.5); background: none; border: 1px solid rgba(56,189,248,0.2); border-radius: 6px; padding: 3px 10px; cursor: pointer; transition: color 0.15s, border-color 0.15s; display: none; }
     .ov-reset.visible { display: block; }
     .ov-reset:hover { color: #38BDF8; border-color: rgba(56,189,248,0.5); }
+    .ov-save-toast { position: fixed; bottom: 5.5rem; right: 1.5rem; font-family: 'Inter', -apple-system, sans-serif; font-size: 0.62rem; font-weight: 600; letter-spacing: 0.06em; color: #34D399; background: rgba(13,15,20,0.92); border: 1px solid rgba(52,211,153,0.3); border-radius: 8px; padding: 5px 12px; z-index: 9999; opacity: 0; transform: translateY(4px); transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none; }
+    .ov-save-toast.show { opacity: 1; transform: none; }
     .ov-grid { flex: 1; overflow-y: auto; padding: 1.5rem 2rem 2rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; align-content: start; }
     .ov-grid::-webkit-scrollbar { width: 6px; }
     .ov-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
@@ -91,10 +93,13 @@
     .ov-thumb.drop-after::after { right: -9px; }
     .ov-thumb-frame-wrap { width: 100%; aspect-ratio: 16/9; overflow: hidden; position: relative; pointer-events: none; }
     .ov-thumb-frame-wrap iframe { position: absolute; top: 0; left: 0; width: 1280px; height: 720px; border: none; transform-origin: top left; pointer-events: none; }
+    #ov-grid.is-dragging .ov-thumb-frame-wrap::after { content: ''; position: absolute; inset: 0; z-index: 5; }
     .ov-thumb-label { padding: 6px 10px; font-family: 'Inter', -apple-system, sans-serif; font-size: 0.6rem; font-weight: 600; color: rgba(255,255,255,0.35); letter-spacing: 0.04em; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.05); }
     .ov-thumb.current .ov-thumb-label { color: #38BDF8; }
     .ov-thumb-num { font-size: 0.58rem; color: rgba(255,255,255,0.18); }
     .ov-thumb.current .ov-thumb-num { color: rgba(56,189,248,0.5); }
+    .ov-thumb.focused { outline: 2px solid rgba(255,255,255,0.75); outline-offset: 2px; }
+    .ov-thumb.focused.current { outline-color: #38BDF8; }
   </style>
 </head>
 <body>
@@ -128,7 +133,7 @@
     <span class="ov-title">Slide Overview</span>
     <div class="ov-header-right">
       <button class="ov-reset" id="btn-reset">↺ Reset order</button>
-      <span class="ov-hint">Drag to reorder · click to jump · G or Esc to close</span>
+      <span class="ov-hint">Drag to reorder · ↑↓←→ navigate · Enter to jump · G or Esc to close</span>
     </div>
   </div>
   <div class="ov-grid" id="ov-grid"></div>
@@ -166,13 +171,39 @@ const btnFs     = document.getElementById('btn-fs');
 const btnOv     = document.getElementById('btn-overview');
 const btnFs2    = document.getElementById('btn-filmstrip');
 const btnReset  = document.getElementById('btn-reset');
+
+const saveToast = document.createElement('div');
+saveToast.className = 'ov-save-toast';
+saveToast.textContent = '✓ Order saved';
+document.body.appendChild(saveToast);
+let saveToastTimer = null;
+
+let saveConfigTimer = null;
+function saveToConfig() {
+  clearTimeout(saveConfigTimer);
+  saveConfigTimer = setTimeout(() => {
+    fetch('/api/save-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slides, labels }),
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return;
+      saveToast.classList.add('show');
+      clearTimeout(saveToastTimer);
+      saveToastTimer = setTimeout(() => saveToast.classList.remove('show'), 1800);
+    })
+    .catch(() => {});
+  }, 400);
+}
 const overview  = document.getElementById('overview');
 const ovGrid    = document.getElementById('ov-grid');
 const filmstrip = document.getElementById('filmstrip');
 const fsTrack   = document.getElementById('filmstrip-track');
 
 let idx = parseInt(location.hash.slice(1)) || 0;
-let ovOpen = false, fsOpen = false, thumbsBuilt = false, fsBuilt = false;
+let ovOpen = false, fsOpen = false, thumbsBuilt = false, fsBuilt = false, ovFocus = 0;
 if (idx < 0 || idx >= slides.length) idx = 0;
 
 function go(newIdx) {
@@ -190,6 +221,28 @@ function toggleFullscreen() {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
   else document.exitFullscreen();
 }
+
+// ── Lazy-load thumbnail iframes (script-stripped, frozen render) ──────────────
+const THUMB_FREEZE = '<style>*,*::before,*::after{animation-duration:0.001ms!important;animation-delay:0ms!important;animation-iteration-count:1!important;transition-duration:0ms!important;}canvas{display:none!important;}.fs-nav{display:none!important;}</style>';
+
+const thumbObserver = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const fr = entry.target.querySelector('iframe[data-src]');
+    if (fr) {
+      const src = fr.dataset.src;
+      delete fr.dataset.src;
+      fetch(src)
+        .then(r => r.text())
+        .then(html => {
+          const noJs = html.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+          fr.srcdoc = noJs.replace('</head>', THUMB_FREEZE + '\n</head>');
+        })
+        .catch(() => { fr.src = src; });
+    }
+    thumbObserver.unobserve(entry.target);
+  });
+}, { root: ovGrid, rootMargin: '120px' });
 
 // ── Overview ─────────────────────────────────────────────────────────────────
 function buildThumbs() {
@@ -212,7 +265,7 @@ function appendThumb(slide, i) {
   wrap.className = 'ov-thumb-frame-wrap';
 
   const fr = document.createElement('iframe');
-  fr.src = slide;
+  fr.dataset.src = slide;
   fr.setAttribute('scrolling', 'no');
   wrap.appendChild(fr);
 
@@ -242,6 +295,7 @@ function appendThumb(slide, i) {
   thumb.addEventListener('dragend',   onDragEnd);
 
   ovGrid.appendChild(thumb);
+  thumbObserver.observe(thumb);
 }
 
 function updateThumbHighlight() {
@@ -259,13 +313,27 @@ function refreshThumbCounters() {
   btnReset.classList.toggle('visible', !isDefaultOrder());
 }
 
+function getGridCols() {
+  return getComputedStyle(ovGrid).gridTemplateColumns.split(' ').length || 1;
+}
+
+function setOvFocus(i) {
+  ovGrid.querySelectorAll('.ov-thumb').forEach(el => el.classList.remove('focused'));
+  const thumbs = ovGrid.querySelectorAll('.ov-thumb');
+  if (!thumbs[i]) return;
+  ovFocus = i;
+  thumbs[i].classList.add('focused');
+  thumbs[i].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
 function openOverview() {
   if (fsOpen) closeFilmstrip();
   ovOpen = true; buildThumbs();
   overview.style.display = 'flex';
   btnOv.classList.add('active');
   btnReset.classList.toggle('visible', !isDefaultOrder());
-  requestAnimationFrame(() => { overview.classList.add('visible'); updateThumbHighlight(); });
+  ovFocus = idx;
+  requestAnimationFrame(() => { overview.classList.add('visible'); updateThumbHighlight(); requestAnimationFrame(() => setOvFocus(ovFocus)); });
 }
 function closeOverview() {
   ovOpen = false; overview.classList.remove('visible'); btnOv.classList.remove('active');
@@ -314,7 +382,7 @@ let dragSrc = null;
 function clearDropIndicators() {
   ovGrid.querySelectorAll('.drop-before,.drop-after').forEach(el => el.classList.remove('drop-before','drop-after'));
 }
-function onDragStart(e) { dragSrc = e.currentTarget; dragSrc.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragSrc.dataset.slide); }
+function onDragStart(e) { dragSrc = e.currentTarget; dragSrc.classList.add('dragging'); ovGrid.classList.add('is-dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragSrc.dataset.slide); }
 function onDragOver(e) {
   e.preventDefault();
   if (!dragSrc || e.currentTarget === dragSrc) return;
@@ -334,10 +402,10 @@ function onDrop(e) {
   clearDropIndicators();
   slides = []; labels = [];
   ovGrid.querySelectorAll('.ov-thumb').forEach(el => { slides.push(el.dataset.slide); labels.push(el.querySelector('.ov-thumb-name').textContent); });
-  refreshThumbCounters(); saveOrder();
+  refreshThumbCounters(); saveOrder(); saveToConfig();
   idx = slides.indexOf(currentSlide); go(idx);
 }
-function onDragEnd() { if (dragSrc) dragSrc.classList.remove('dragging'); clearDropIndicators(); dragSrc = null; }
+function onDragEnd() { if (dragSrc) dragSrc.classList.remove('dragging'); ovGrid.classList.remove('is-dragging'); clearDropIndicators(); dragSrc = null; }
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
 btnReset.addEventListener('click', () => {
@@ -353,7 +421,15 @@ function handleKey(key) {
   if (key === 'g' || key === 'G') { toggleOverview(); return; }
   if (key === 't' || key === 'T') { toggleFilmstrip(); return; }
   if (key === 'Escape') { if (ovOpen) { closeOverview(); return; } if (fsOpen) { closeFilmstrip(); return; } }
-  if (ovOpen) return;
+  if (ovOpen) {
+    const cols = getGridCols();
+    if (key === 'ArrowRight') { setOvFocus(Math.min(slides.length - 1, ovFocus + 1)); return; }
+    if (key === 'ArrowLeft')  { setOvFocus(Math.max(0, ovFocus - 1)); return; }
+    if (key === 'ArrowDown')  { setOvFocus(Math.min(slides.length - 1, ovFocus + cols)); return; }
+    if (key === 'ArrowUp')    { setOvFocus(Math.max(0, ovFocus - cols)); return; }
+    if (key === 'Enter')      { go(ovFocus); closeOverview(); return; }
+    return;
+  }
   if (key === 'ArrowRight' || key === 'ArrowDown' || key === ' ' || key === 'PageDown') go(idx + 1);
   else if (key === 'ArrowLeft' || key === 'ArrowUp' || key === 'PageUp') go(idx - 1);
   else if (key === 'f' || key === 'F') toggleFullscreen();
@@ -367,6 +443,20 @@ btnFs.addEventListener('click', () => toggleFullscreen());
 btnOv.addEventListener('click', () => toggleOverview());
 btnFs2.addEventListener('click', () => toggleFilmstrip());
 overview.addEventListener('click', e => { if (e.target === overview) closeOverview(); });
+
+// ── 16:9 letterbox — fixed 1280×720, scaled to fit ───────────────────────────
+function sizeFrame() {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const ratio = 16 / 9;
+  let cw;
+  if (vw / vh > ratio) { cw = vh * ratio; } else { cw = vw; }
+  const scale = cw / 1280;
+  frame.style.transform = `scale(${scale})`;
+  frame.style.left = ((vw - 1280 * scale) / 2) + 'px';
+  frame.style.top  = ((vh -  720 * scale) / 2) + 'px';
+}
+window.addEventListener('resize', sizeFrame);
+sizeFrame();
 
 go(idx);
 </script>

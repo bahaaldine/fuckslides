@@ -19,6 +19,9 @@ switch (cmd) {
   case 'create':
     require('./create')(args[0]);
     break;
+  case 'import':
+    require('./import')(args);
+    break;
   case 'pdf':
     require('./pdf')(loadConfig(process.cwd()));
     break;
@@ -33,9 +36,10 @@ switch (cmd) {
   fuckSlides — no-bullshit HTML presentations
 
   Commands:
-    fuckslides create <name>   Scaffold a new presentation
-    fuckslides serve           Open presentation in browser with player
-    fuckslides pdf             Export all slides to PDF
-    fuckslides gif <slide>     Export a slide to animated GIF
+    fuckslides create <name>          Scaffold a new presentation
+    fuckslides import <file …>        Convert PDF or images to slides (requires ANTHROPIC_API_KEY)
+    fuckslides serve                  Open presentation in browser with player
+    fuckslides pdf                    Export all slides to PDF
+    fuckslides gif <slide>            Export a slide to animated GIF
 `);
 }

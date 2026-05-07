@@ -459,6 +459,7 @@
       <a href="#cmd-pdf" class="nav-item">pdf</a>
       <a href="#cmd-gif" class="nav-item">gif</a>
       <a href="#cmd-create" class="nav-item">create</a>
+      <a href="#cmd-import" class="nav-item">import</a>
     </div>
 
     <div class="nav-section">
@@ -873,6 +874,70 @@
       </div>
 
       <p>Creates <code>my-talk/</code> with <code>slides/index.html</code>, <code>fuckslides.config.js</code>, and <code>package.json</code>.</p>
+    </section>
+
+    <section class="doc-section" id="cmd-import">
+      <h3>fuckslides import &lt;file …&gt;</h3>
+      <p>Converts an existing PDF or a set of images into a complete fuckSlides presentation using Claude's vision API. The fastest way to go from an existing deck to a fully animated HTML presentation.</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> export ANTHROPIC_API_KEY=sk-ant-...
+<span class="clr">$</span> fuckslides import deck.pdf
+<span class="dim">
+  📄  12 pages found in deck.pdf
+  [1/12] Converting slide… ✅
+  [2/12] Converting slide… ✅
+  ...
+  [12/12] Converting slide… ✅
+
+✅  12 slides imported into slides/
+
+  fuckslides serve</span></pre>
+      </div>
+
+      <p>Accepts a PDF, individual images (PNG, JPG, WebP), or a mix:</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides import deck.pdf
+<span class="clr">$</span> fuckslides import slide1.png slide2.png slide3.png
+<span class="clr">$</span> fuckslides import export/*.jpg</pre>
+      </div>
+
+      <p><strong>What it does:</strong></p>
+      <ul style="margin: 10px 0 14px 22px; color: var(--muted); display: flex; flex-direction: column; gap: 5px; font-size: 14px;">
+        <li>For PDFs — extracts each page as a screenshot using Puppeteer + pdf-lib</li>
+        <li>Sends every slide image to Claude with a detailed fuckSlides design prompt</li>
+        <li>Gets back a complete, animated HTML file per slide</li>
+        <li>Writes to <code>slides/</code> and generates <code>fuckslides.config.js</code></li>
+      </ul>
+
+      <p>The generated slides reproduce the content and layout of the originals and apply the full fuckSlides design system — dark background, dot-grid, Inter typography, staggered fade-up animations.</p>
+
+      <h4 style="margin-top:28px; margin-bottom:12px; font-size:13px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--muted);">Full example — PDF to live presentation</h4>
+
+      <div class="code-block">
+        <pre><span class="cm"># 1. Set your API key</span>
+<span class="clr">$</span> export ANTHROPIC_API_KEY=sk-ant-...
+
+<span class="cm"># 2. Create a project folder and import</span>
+<span class="clr">$</span> mkdir my-talk &amp;&amp; cd my-talk
+<span class="clr">$</span> fuckslides import ~/Downloads/q3-review.pdf
+
+<span class="cm"># 3. Open in the player</span>
+<span class="clr">$</span> fuckslides serve</pre>
+      </div>
+
+      <h4 style="margin-top:28px; margin-bottom:12px; font-size:13px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--muted);">Full example — screenshots to live presentation</h4>
+
+      <div class="code-block">
+        <pre><span class="cm"># Export your Google Slides or Keynote as PNG images first,
+# then point fuckslides import at them</span>
+<span class="clr">$</span> mkdir my-talk &amp;&amp; cd my-talk
+<span class="clr">$</span> fuckslides import ~/Desktop/slides/*.png
+<span class="clr">$</span> fuckslides serve</pre>
+      </div>
+
+      <p style="margin-top:16px;"><strong>Requires:</strong> <code>ANTHROPIC_API_KEY</code> environment variable. The SDK (<code>@anthropic-ai/sdk</code>) is included as a dependency — no extra install needed.</p>
     </section>
 
 

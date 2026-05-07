@@ -136,6 +136,48 @@ Scaffolds a new presentation.
 fuckslides create my-talk
 ```
 
+### `fuckslides import <file …>`
+
+Converts an existing PDF or a set of images into a fuckSlides presentation using Claude's vision API.
+
+```bash
+fuckslides import deck.pdf
+fuckslides import slide1.png slide2.png slide3.png
+```
+
+Requires an Anthropic API key:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+fuckslides import deck.pdf
+```
+
+**What it does:**
+
+1. For PDFs — extracts each page as a screenshot using Puppeteer
+2. Sends every slide image to Claude with a detailed fuckSlides design prompt
+3. Receives a complete, styled HTML file per slide
+4. Writes them to `slides/` and generates `fuckslides.config.js`
+5. Run `fuckslides serve` and you're live
+
+**Example — starting from a PDF:**
+
+```bash
+mkdir my-talk && cd my-talk
+fuckslides import ../my-existing-deck.pdf
+fuckslides serve
+```
+
+**Example — starting from screenshots:**
+
+```bash
+mkdir my-talk && cd my-talk
+fuckslides import ~/Desktop/slide-*.png
+fuckslides serve
+```
+
+The generated slides faithfully reproduce the content and layout of the originals and apply the fuckSlides design system — dark background, dot-grid, Inter typography, staggered fade-up animations.
+
 ---
 
 ## Writing slides

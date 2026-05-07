@@ -1,6 +1,6 @@
 # fuckSlides
 
-A no-bullshit HTML presentation framework. Your slides are plain HTML files. fuckSlides provides everything around them — a presenter player, keyboard navigation, slide overview, filmstrip, PDF export, and animated GIF export.
+A no-bullshit HTML presentation framework. Your slides are plain HTML files. fuckSlides provides everything around them — a presenter player, keyboard navigation, slide overview, filmstrip, in-browser editor, speaker notes, PDF export, and animated GIF export.
 
 No build step. No lock-in. Every slide is just a file you can open in a browser.
 
@@ -29,7 +29,7 @@ npm install
 fuckslides serve
 ```
 
-That's it. A browser opens with your presentation in the player.
+A browser opens with your presentation in the player.
 
 ---
 
@@ -38,10 +38,12 @@ That's it. A browser opens with your presentation in the player.
 ```
 my-talk/
   slides/
-    index.html          ← your slides go here
-    slide-2.html
+    cover.html
+    problem.html
+    solution.html
     ...
-  fuckslides.config.js  ← slide manifest + options
+  fuckslides.config.js   ← slide manifest + options
+  notes.json             ← speaker notes (auto-created, one key per slide)
   package.json
 ```
 
@@ -49,11 +51,9 @@ my-talk/
 
 ## fuckslides.config.js
 
-This is the only config file you need. It lives at the root of your presentation.
-
 ```js
 module.exports = {
-  // Presentation name — used as the PDF filename and player title
+  // Presentation name — used as PDF filename and player title
   name: 'my-talk',
 
   // Directory containing your HTML slides (default: 'slides')
@@ -61,21 +61,25 @@ module.exports = {
 
   // Ordered list of slide filenames
   slides: [
-    'index.html',
+    'cover.html',
     'problem.html',
     'solution.html',
     'demo.html',
     'thank-you.html',
   ],
 
-  // Human-readable labels shown in the overview panel
-  // Must match the slides array length
+  // Human-readable labels shown in the slide overview
   labels: [
-    'Title',
+    'Cover',
     'The Problem',
     'The Solution',
     'Demo',
     'Thank You',
+  ],
+
+  // Slides to skip during navigation (still visible in overview, greyed out)
+  disabled: [
+    'backup-slide.html',
   ],
 
   // Dev server port (default: 3000)
@@ -95,7 +99,7 @@ Opens the presentation in a browser with the full player shell.
 fuckslides serve
 ```
 
-The player runs at `http://localhost:3000`. Slides are served from your `slides/` directory. The slide manifest is injected automatically — no hardcoding in your HTML files.
+Runs at `http://localhost:3000`. The slide manifest is injected automatically into every slide — you never hardcode it.
 
 ### `fuckslides pdf`
 
@@ -106,10 +110,7 @@ fuckslides pdf
 # → my-talk.pdf
 ```
 
-Uses Puppeteer under the hood. Automatically:
-- Finishes all CSS keyframe animations
-- Forces scroll-reveal elements visible
-- Applies any per-slide overrides you define (see [PDF overrides](#pdf-overrides))
+Uses Puppeteer. Automatically finishes all CSS keyframe animations, forces scroll-reveal elements visible, and applies per-slide overrides you define (see [PDF overrides](#pdf-overrides)).
 
 ### `fuckslides gif <slide>`
 
@@ -120,40 +121,30 @@ fuckslides gif demo.html
 # → demo.gif
 ```
 
-Captures at **2560×1440** (2× retina), **20fps**, **13 seconds** via Puppeteer, then encodes with [gifski](https://gif.ski) for maximum quality.
+Captures at **2560×1440** (2× retina), **20fps**, **13 seconds**, then encodes with [gifski](https://gif.ski) for maximum quality.
 
-Requires gifski to be installed:
+Requires gifski:
 ```bash
 brew install gifski   # macOS
 ```
 
 ### `fuckslides create <name>`
 
-Scaffolds a new presentation directory.
+Scaffolds a new presentation.
 
 ```bash
 fuckslides create my-talk
-```
-
-Creates:
-```
-my-talk/
-  slides/index.html
-  fuckslides.config.js
-  package.json
 ```
 
 ---
 
 ## Writing slides
 
-Each slide is a standalone HTML file. The only requirement is including the fuckSlides runtime script:
+Each slide is a standalone HTML file fixed at **1280×720**. The only requirement is including the runtime:
 
 ```html
 <script src="/js/fuckslides.js"></script>
 ```
-
-This gives you keyboard navigation, scroll reveals, and counter animations for free.
 
 ### Minimal slide
 
@@ -165,134 +156,277 @@ This gives you keyboard navigation, scroll reveals, and counter animations for f
   <title>My Slide</title>
   <style>
     html, body {
-      width: 100%; height: 100vh; overflow: hidden;
+      width: 1280px; height: 720px; overflow: hidden;
       display: flex; align-items: center; justify-content: center;
-      background: #0A1520; color: #fff;
+      background: #0d0f14; color: #fff;
       font-family: 'Inter', sans-serif;
     }
-    h1 { font-size: clamp(3rem, 7vw, 8rem); font-weight: 900; }
+    h1 { font-size: 96px; font-weight: 900; letter-spacing: -0.04em; }
   </style>
 </head>
 <body>
-  <h1>Hello, world.</h1>
+  <h1>Hello.</h1>
   <script src="/js/fuckslides.js"></script>
 </body>
 </html>
 ```
 
-> **Note:** Slides are designed for **1280×720** (16:9). Use `clamp()` and `vw`/`vh` units to keep layouts fluid.
+### Real slide — title + stat cards
+
+A realistic slide with entrance animations, a dot-grid background, and a stat grid:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Why Now</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 1280px; height: 720px; overflow: hidden;
+      font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased;
+      background: #0d0f14; color: #fff;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+    }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .slide {
+      width: 1280px; height: 720px;
+      display: flex; flex-direction: column; justify-content: center;
+      padding: 0 80px; gap: 48px; position: relative; z-index: 1;
+    }
+
+    .eyebrow {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.22em;
+      text-transform: uppercase; color: #38BDF8;
+      opacity: 0; animation: fade-up 0.5s ease forwards 0.05s;
+    }
+
+    h1 {
+      font-size: 64px; font-weight: 900; letter-spacing: -0.04em;
+      line-height: 1; color: #fff;
+      opacity: 0; animation: fade-up 0.5s ease forwards 0.15s;
+    }
+
+    h1 em { color: #38BDF8; font-style: normal; }
+
+    .cards {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-top: 2px solid #38BDF8;
+      border-radius: 12px;
+      padding: 24px 28px;
+      opacity: 0;
+    }
+    .card:nth-child(1) { animation: fade-up 0.5s ease forwards 0.3s; }
+    .card:nth-child(2) { animation: fade-up 0.5s ease forwards 0.42s; }
+    .card:nth-child(3) { animation: fade-up 0.5s ease forwards 0.54s; }
+
+    .card-num {
+      font-size: 52px; font-weight: 900; letter-spacing: -0.04em;
+      color: #38BDF8; line-height: 1;
+    }
+
+    .card-label {
+      margin-top: 8px; font-size: 14px; color: rgba(255,255,255,0.5);
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <div>
+      <div class="eyebrow">Market Timing</div>
+      <h1>The window is <em>now.</em></h1>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-num">4×</div>
+        <div class="card-label">faster queries than the previous stack</div>
+      </div>
+      <div class="card">
+        <div class="card-num">60%</div>
+        <div class="card-label">reduction in infrastructure cost</div>
+      </div>
+      <div class="card">
+        <div class="card-num">1 day</div>
+        <div class="card-label">typical migration from Prometheus</div>
+      </div>
+    </div>
+  </div>
+  <script src="/js/fuckslides.js"></script>
+</body>
+</html>
+```
 
 ### Scroll reveals
-
-Add the `.reveal` class to any element. It will fade in when it enters the viewport (or immediately in PDF export).
 
 ```html
 <p class="reveal">This appears on scroll.</p>
 ```
 
-CSS you need to add to your slide:
-
 ```css
-.reveal {
-  opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 0.5s ease, transform 0.5s ease;
-}
-.reveal.visible {
-  opacity: 1;
-  transform: none;
-}
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.5s, transform 0.5s; }
+.reveal.visible { opacity: 1; transform: none; }
 ```
 
 ### Animated counters
-
-Add `data-target` to any element. The number animates up when it enters the viewport.
 
 ```html
 <span data-target="25" data-suffix="×"></span>
 <span data-target="99.9" data-suffix="%" data-prefix="~"></span>
 ```
 
+The number animates up when the slide becomes visible. In PDF export it snaps to the final value.
+
 ---
 
 ## Player features
 
-The player shell (`fuckslides serve`) provides:
-
-| Feature | How to trigger |
-|---------|---------------|
+| Feature | Shortcut |
+|---------|----------|
 | Next slide | `→` `↓` `Space` `PageDown` |
 | Previous slide | `←` `↑` `PageUp` |
 | Fullscreen | `F` |
 | Slide overview | `G` |
 | Filmstrip | `T` |
+| In-browser editor | `E` |
+| Speaker notes | `N` |
 | Close overlay | `Esc` |
 | Clicker support | `PageDown` / `PageUp` |
 
-### Slide overview (G)
+### Slide overview (`G`)
 
-Full-screen grid of all slides as live thumbnails. Click any slide to jump to it. **Drag and drop** to reorder — the new order is saved in `localStorage` and persists across sessions. Reset button restores the original order.
+Full-screen grid of all slides as live thumbnails. Click any slide to jump. **Drag to reorder** — the new order is saved instantly to `fuckslides.config.js` and `localStorage`. Slides marked `disabled` in your config appear greyed out with a strikethrough; you can toggle them on/off per-session with the ⊘ button on each thumbnail.
 
-### Filmstrip (T)
+### Filmstrip (`T`)
 
 Horizontal strip of thumbnails that slides up from the bottom. Click to jump.
 
-### Keyboard focus after mouse click
+### In-browser editor (`E`)
 
-If you click inside a slide with your mouse, keyboard focus moves to the iframe. fuckSlides forwards all `keydown` events from the iframe back to the player via `postMessage`, so navigation keeps working.
+A full split-pane code editor for the current slide, without leaving the browser.
+
+- **Left pane** — syntax-highlighted HTML source with live editing
+- **Right pane** — live preview with hover-to-edit: hover any text element to highlight it, click to edit it inline. Changes sync back to the code pane in real time.
+- **Autosaves** to disk after 1.5 seconds of idle — the main slide reloads automatically.
+- Drag the centre divider to resize panes. `+` / `−` buttons zoom each pane independently.
+- `Esc` closes the editor (or exits inline text editing first if one is active).
+
+### Speaker notes (`N`)
+
+A slide-up notes panel for presenter use.
+
+- Each slide has its own notes, stored in `notes.json` at your project root.
+- Notes autosave after 1 second of idle. The file is plain JSON — easy to diff and commit.
+- Notes update automatically when you navigate between slides.
+- Typing in the notes panel does not interfere with slide navigation shortcuts.
+
+`notes.json` example:
+```json
+{
+  "cover.html": "Wait for the room to settle. Don't open with the deck — open with the question.",
+  "problem.html": "Pause after the Datadog bill number. Let it land.",
+  "solution.html": "This is the pivot point. Energy up here.",
+  "demo.html": "Live demo — have the terminal ready in a second Space. If it breaks, pivot to the GIF."
+}
+```
+
+---
+
+## Disabling slides
+
+Mark slides as skipped in your config:
+
+```js
+disabled: [
+  'appendix-pricing.html',
+  'backup-competitive.html',
+],
+```
+
+Disabled slides are excluded from navigation (`→` / `←`) but remain visible in the slide overview, greyed out. Toggle them on/off per-session from the overview without editing the config. The state is saved back to `fuckslides.config.js` automatically.
+
+This is useful for backup slides, appendices, or content you want available but not in the default flow.
 
 ---
 
 ## PDF overrides
 
-Some slides have JS-driven animations or multi-step states that need special handling before Puppeteer captures them. Define per-slide overrides in your config:
+Some slides need special handling before Puppeteer captures them — animations mid-play, multi-step states, etc.
 
 ```js
-module.exports = {
-  // ...
-  pdfOverrides: {
+pdfOverrides: {
 
-    // Wait extra time for a JS animation to complete
-    'my-animated-slide.html': {
-      wait: 5000,  // extra ms on top of the default 2000ms
-    },
-
-    // Inject JS to reach the desired state before capture
-    'my-step-slide.html': {
-      extra: `
-        if (typeof goToLastStep === 'function') goToLastStep();
-      `,
-      wait: 1500,
-    },
-
-    // Combine both
-    'my-scramble-intro.html': {
-      extra: `
-        document.querySelectorAll('[data-char]').forEach(el => {
-          el.textContent = el.dataset.char;
-        });
-      `,
-      wait: 300,
-    },
+  // Force an odometer-style animation to its final state
+  'storage.html': {
+    extra: `
+      document.querySelectorAll('.odo-slot').forEach(slot => {
+        const strip = slot.querySelector('.odo-strip');
+        strip.style.transition = 'none';
+        strip.style.transform = 'translateY(-' + ((30 + parseInt(slot.dataset.target)) * 152) + 'px)';
+      });
+    `,
+    wait: 300,
   },
-};
+
+  // Snap a number counter to its final value
+  'metrics.html': {
+    extra: `
+      const n = document.getElementById('big-num');
+      n.style.transition = 'none';
+      n.style.opacity = '1';
+      n.style.transform = 'scale(1)';
+    `,
+    wait: 200,
+  },
+
+  // Show the "completed" state of a multi-step migration diagram
+  'migrate.html': {
+    extra: `
+      for (let i = 0; i < 5; i++) {
+        const pill = document.getElementById('pill-' + i);
+        pill.classList.remove('pill-ready');
+        pill.classList.add('pill-migrated');
+        pill.textContent = 'Migrated';
+      }
+      document.getElementById('progress-fill').style.width = '100%';
+    `,
+    wait: 200,
+  },
+
+},
 ```
 
-The `extra` script runs after the global animation finisher, which already:
-- Calls `document.getAnimations().forEach(a => a.finish())` on every slide
-- Forces all `.reveal` elements visible
+The `extra` script runs after the global finisher, which already calls `getAnimations().forEach(a => a.finish())` and forces all `.reveal` elements visible.
 
 ---
 
 ## Updating the framework
 
-Because your presentation depends on `fuck-slides` as an npm package, updating is one command:
-
 ```bash
 npm update fuck-slides
 ```
 
-All framework improvements — player features, better PDF export, GIF quality — apply instantly to every presentation that runs this command.
+All player improvements — new shortcuts, better PDF export, editor features — apply to every presentation that runs this command.
 
 ---
 
@@ -301,22 +435,25 @@ All framework improvements — player features, better PDF export, GIF quality �
 ```
 fuckslides serve
   └─ HTTP server at localhost:3000
-       ├─ GET /          → player.html (from fuck-slides package)
-       │                    with slide manifest injected as window.FUCKSLIDES_SLIDES
-       ├─ GET /js/fuckslides.js → runtime (from fuck-slides package)
-       └─ GET /slide.html → your slide file (from slides/)
+       ├─ GET /                   → player.html (injected with slide manifest)
+       ├─ GET /js/fuckslides.js   → runtime
+       ├─ GET /slide.html         → your slide (manifest injected)
+       ├─ GET /api/source         → raw slide source (for the editor)
+       ├─ GET /api/notes          → all speaker notes as JSON
+       ├─ POST /api/save          → write edited slide HTML to disk
+       ├─ POST /api/save-notes    → update notes.json for one slide
+       └─ POST /api/save-order    → write new slide order to fuckslides.config.js
 
 fuckslides pdf
-  └─ Puppeteer opens each slide via file://
-       → injects animation finisher JS
+  └─ Puppeteer opens each slide
+       → injects animation finisher
        → applies pdfOverrides
-       → captures via page.pdf()
-       → merges with pdf-lib
+       → page.pdf() → merges with pdf-lib
 
 fuckslides gif <slide>
-  └─ Puppeteer opens slide at 1280×720, deviceScaleFactor: 2
-       → captures 260 frames at 20fps
-       → encodes with gifski --quality 100
+  └─ Puppeteer at 2560×1440, deviceScaleFactor: 2
+       → 260 frames at 20fps
+       → gifski --quality 100
 ```
 
 ---

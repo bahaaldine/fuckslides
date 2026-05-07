@@ -57,11 +57,11 @@
       flex-shrink: 0;
     }
     .logo-mark {
-      width: 28px; height: 28px; border-radius: 7px;
-      background: var(--accent);
+      width: 36px; height: 36px; border-radius: 8px;
+      overflow: hidden; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      font-size: 14px; line-height: 1;
     }
+    .logo-mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .logo-name { color: var(--text); }
     .logo-name .dim { color: var(--muted); font-weight: 400; }
     .header-gap { flex: 1; }
@@ -143,6 +143,14 @@
       padding-bottom: 48px;
       border-bottom: 1px solid var(--border);
     }
+    .hero-logo {
+      width: 80px; height: 80px;
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(255,68,0,0.25);
+    }
+    .hero-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .hero-eyebrow {
       display: inline-flex; align-items: center; gap: 7px;
       font-family: 'JetBrains Mono', monospace;
@@ -406,7 +414,7 @@
 <!-- ══════════ HEADER ══════════ -->
 <header class="site-header">
   <a href="#" class="logo">
-    <div class="logo-mark">⚡</div>
+    <div class="logo-mark"><img src="logo.png" alt="fuckSlides"></div>
     <span class="logo-name">fuck<span class="dim">Slides</span></span>
   </a>
   <span class="version-badge">v0.1.0</span>
@@ -475,6 +483,7 @@
 
     <!-- HERO -->
     <div class="hero">
+      <div class="hero-logo"><img src="logo.png" alt="fuckSlides"></div>
       <div class="hero-eyebrow">No-bullshit HTML presentations</div>
       <h1 class="hero-title">Your slides are <span class="accent">HTML.</span><br>Finally.</h1>
       <p class="hero-subtitle">

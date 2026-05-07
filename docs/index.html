@@ -458,6 +458,8 @@
       <a href="#keyboard" class="nav-item">Keyboard Shortcuts</a>
       <a href="#overview" class="nav-item">Overview</a>
       <a href="#disable-slides" class="nav-item">Disable Slides</a>
+      <a href="#editor" class="nav-item">In-Browser Editor</a>
+      <a href="#notes" class="nav-item">Speaker Notes</a>
     </div>
 
     <div class="nav-section">
@@ -517,6 +519,16 @@
           <div class="feature-card-icon">🗂️</div>
           <div class="feature-card-title">Slide overview</div>
           <div class="feature-card-desc">Live thumbnails, drag-to-reorder, disable slides mid-presentation.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">✏️</div>
+          <div class="feature-card-title">In-browser editor</div>
+          <div class="feature-card-desc">Split-pane code editor with hover-to-edit live preview. Autosaves to disk.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-icon">🗒️</div>
+          <div class="feature-card-title">Speaker notes</div>
+          <div class="feature-card-desc">Per-slide notes panel. Stored in <code>notes.json</code>, autosaved, synced as you navigate.</div>
         </div>
         <div class="feature-card">
           <div class="feature-card-icon">🔌</div>
@@ -868,6 +880,8 @@
             <tr><td><strong>Previous slide</strong></td><td><kbd>←</kbd> <kbd>↑</kbd> <kbd>PageUp</kbd></td></tr>
             <tr><td><strong>Slide overview</strong></td><td><kbd>G</kbd></td></tr>
             <tr><td><strong>Filmstrip</strong></td><td><kbd>T</kbd></td></tr>
+            <tr><td><strong>In-browser editor</strong></td><td><kbd>E</kbd></td></tr>
+            <tr><td><strong>Speaker notes</strong></td><td><kbd>N</kbd></td></tr>
             <tr><td><strong>Fullscreen</strong></td><td><kbd>F</kbd></td></tr>
             <tr><td><strong>Close overlay</strong></td><td><kbd>Esc</kbd></td></tr>
           </tbody>
@@ -898,6 +912,121 @@
       <div class="callout">
         <span class="callout-icon">🎭</span>
         <span>This is designed for live presentations where you want to conditionally skip backup slides or time-dependent content without having to edit the config mid-talk.</span>
+      </div>
+    </section>
+
+
+    <!-- ══ EDITOR ══ -->
+    <section class="doc-section" id="editor">
+      <h3>In-Browser Editor</h3>
+      <p>Press <kbd>E</kbd> to open a split-pane code editor for the current slide — without leaving the browser tab.</p>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-card-title">Left pane — Source</div>
+          <div class="feature-card-desc">Syntax-highlighted HTML editor. Edit the raw source directly. Changes reflect in the preview after a short debounce.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-title">Right pane — Live preview</div>
+          <div class="feature-card-desc">The actual slide, rendered. Hover any text element to highlight it; click to edit inline. Changes sync back to the code pane.</div>
+        </div>
+      </div>
+
+      <p>The workflow for a quick fix during prep:</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Open the editor</div>
+            <div class="step-desc">Press <kbd>E</kbd>. The editor overlays the player with the current slide's source on the left and a live preview on the right.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Edit in the preview</div>
+            <div class="step-desc">Hover over any text in the right pane. It highlights with a blue outline. Click to make it <code>contenteditable</code>. Type your change. The code pane updates live.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Or edit in the source</div>
+            <div class="step-desc">Click the left pane and edit the HTML directly. The preview re-renders as you type (400ms debounce).</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">Autosaves</div>
+            <div class="step-desc">After 1.5s idle, the change is written to disk and the main slide reloads. The status bar shows <strong>✓ Autosaved</strong>.</div>
+          </div>
+        </div>
+      </div>
+
+      <p>Other controls in the editor:</p>
+
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead><tr><th>Action</th><th>How</th></tr></thead>
+          <tbody>
+            <tr><td>Resize panes</td><td>Drag the centre divider</td></tr>
+            <tr><td>Zoom code pane</td><td><kbd>+</kbd> / <kbd>−</kbd> buttons in the code toolbar, or click the percentage to reset</td></tr>
+            <tr><td>Zoom preview pane</td><td><kbd>+</kbd> / <kbd>−</kbd> buttons in the preview toolbar — scrolls when larger than the pane</td></tr>
+            <tr><td>Stop inline editing</td><td><kbd>Esc</kbd> — exits text editing and returns to hover mode</td></tr>
+            <tr><td>Close editor</td><td><kbd>Esc</kbd> again (or from the code pane directly)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <span>Hover-to-edit skips structural elements (html, body, svg paths, etc.) and targets the innermost element with visible text. It won't accidentally select a wrapper div.</span>
+      </div>
+    </section>
+
+
+    <!-- ══ NOTES ══ -->
+    <section class="doc-section" id="notes">
+      <h3>Speaker Notes</h3>
+      <p>Press <kbd>N</kbd> to open a slide-up notes panel at the bottom of the screen. Each slide has its own notes — type freely, they autosave after 1 second of idle.</p>
+
+      <p>Notes are stored in <code>notes.json</code> at your project root, one key per slide filename:</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="code-filename">notes.json</span><span class="code-lang">JSON</span></div>
+        <pre><span class="pun">{</span>
+  <span class="key">"cover.html"</span><span class="pun">:</span> <span class="str">"Wait for the room to settle before clicking. Don't open with the deck — open with the question."</span><span class="pun">,</span>
+
+  <span class="key">"problem.html"</span><span class="pun">:</span> <span class="str">"Pause after the Datadog bill slide. Let the number land. Someone in the room will laugh."</span><span class="pun">,</span>
+
+  <span class="key">"solution.html"</span><span class="pun">:</span> <span class="str">"This is the pivot. Slow down. Make sure they've connected the pain to this before moving on."</span><span class="pun">,</span>
+
+  <span class="key">"demo.html"</span><span class="pun">:</span> <span class="str">"Live demo — terminal ready in a second Space. If it breaks, say 'let me show you the recorded version' and switch to the GIF. Don't apologise."</span><span class="pun">,</span>
+
+  <span class="key">"pricing.html"</span><span class="pun">:</span> <span class="str">"Don't lead with the number. Lead with the comparison — 'you're paying 4x for the same outcome'. The number feels smaller after that."</span>
+<span class="pun">}</span></pre>
+      </div>
+
+      <p>The file is plain JSON — easy to diff, commit alongside your slides, and share with co-presenters. Deleting a slide's notes from the panel removes its key from the file.</p>
+
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead><tr><th>Behaviour</th><th>Detail</th></tr></thead>
+          <tbody>
+            <tr><td>Open / close</td><td><kbd>N</kbd> or the notepad icon in the nav bar</td></tr>
+            <tr><td>Autosave</td><td>1 second after you stop typing — status line shows <strong>✓ Saved</strong></td></tr>
+            <tr><td>Slide sync</td><td>Notes update automatically when you navigate to a different slide</td></tr>
+            <tr><td>Key conflicts</td><td>Typing in the notes textarea does not trigger slide navigation</td></tr>
+            <tr><td>Close from textarea</td><td><kbd>Esc</kbd> closes the panel without losing unsaved text</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout tip">
+        <span class="callout-icon">📝</span>
+        <span>The notes panel is designed for use during prep, not live presenting — it covers part of the slide. For an actual presenter display (notes on a second screen), use the standalone slide URL in a second window.</span>
       </div>
     </section>
 

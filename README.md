@@ -180,7 +180,7 @@ A realistic slide with entrance animations, a dot-grid background, and a stat gr
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Why Now</title>
+  <title>By the Numbers</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -254,21 +254,21 @@ A realistic slide with entrance animations, a dot-grid background, and a stat gr
 <body>
   <div class="slide">
     <div>
-      <div class="eyebrow">Market Timing</div>
-      <h1>The window is <em>now.</em></h1>
+      <div class="eyebrow">Key Results</div>
+      <h1>Progress so <em>far.</em></h1>
     </div>
     <div class="cards">
       <div class="card">
-        <div class="card-num">4×</div>
-        <div class="card-label">faster queries than the previous stack</div>
+        <div class="card-num">12k</div>
+        <div class="card-label">users onboarded in the first month</div>
       </div>
       <div class="card">
-        <div class="card-num">60%</div>
-        <div class="card-label">reduction in infrastructure cost</div>
+        <div class="card-num">94%</div>
+        <div class="card-label">satisfaction score across all cohorts</div>
       </div>
       <div class="card">
-        <div class="card-num">1 day</div>
-        <div class="card-label">typical migration from Prometheus</div>
+        <div class="card-num">3 days</div>
+        <div class="card-label">median time from signup to first value</div>
       </div>
     </div>
   </div>
@@ -343,10 +343,10 @@ A slide-up notes panel for presenter use.
 `notes.json` example:
 ```json
 {
-  "cover.html": "Wait for the room to settle. Don't open with the deck — open with the question.",
-  "problem.html": "Pause after the Datadog bill number. Let it land.",
-  "solution.html": "This is the pivot point. Energy up here.",
-  "demo.html": "Live demo — have the terminal ready in a second Space. If it breaks, pivot to the GIF."
+  "cover.html": "Wait for the room to settle before clicking. Start with the question, not the deck.",
+  "context.html": "Two minutes max on this slide. They already know the background.",
+  "demo.html": "Live demo — terminal ready in a second Space. If it breaks, say 'let me show the recording' and move on.",
+  "cta.html": "Slow down here. Make sure the ask is clear before you leave this slide."
 }
 ```
 

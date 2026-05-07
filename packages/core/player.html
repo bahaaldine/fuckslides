@@ -34,14 +34,18 @@
     .nav-counter {
       font-family: 'Inter', -apple-system, sans-serif;
       font-size: 0.62rem; font-weight: 800;
-      color: rgba(255,255,255,0.45); letter-spacing: 0.06em;
+      color: #F05000; letter-spacing: 0.06em;
       padding: 0 0.35rem; user-select: none;
-      transition: color 0.4s ease;
+    }
+    .nav-logo {
+      width: 22px; height: 22px; border-radius: 5px;
+      display: block; flex-shrink: 0; margin-left: 0.1rem;
+      object-fit: cover;
     }
     .nav-title {
       font-family: 'Inter', -apple-system, sans-serif;
       font-size: 0.58rem; font-weight: 600; letter-spacing: 0.06em;
-      color: rgba(255,255,255,0.28); padding: 0 0.3rem 0 0.15rem;
+      color: rgba(255,255,255,0.28); padding: 0 0.3rem 0 0.55rem;
       user-select: none; white-space: nowrap; max-width: 160px;
       overflow: hidden; text-overflow: ellipsis;
     }
@@ -172,6 +176,10 @@
       padding: 0.6rem 1.1rem;
       border-bottom: 1px solid rgba(255,255,255,0.12);
       background: #13151c;
+    }
+    .editor-logo {
+      width: 20px; height: 20px; border-radius: 4px;
+      object-fit: cover; flex-shrink: 0; margin-right: 0.65rem;
     }
     .editor-filename {
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
@@ -309,6 +317,7 @@
 </div>
 
 <nav class="preso-nav" id="preso-nav">
+  <img class="nav-logo" src="/logo.png" alt="">
   <span class="nav-title" id="nav-title"></span>
   <div class="nav-sep"></div>
   <button class="nav-btn" id="btn-prev" title="Previous (←)">
@@ -336,6 +345,7 @@
 
 <div id="editor-overlay">
   <div class="editor-header">
+    <img class="editor-logo" src="/logo.png" alt="">
     <span class="editor-filename" id="editor-filename"></span>
     <div class="editor-hints">
       <span>hover to edit · autosaves · <kbd>Esc</kbd> close</span>
@@ -1202,40 +1212,6 @@ presoNav.addEventListener('mouseenter', () => clearTimeout(navHideTimer));
 presoNav.addEventListener('mouseleave', showNavBar);
 showNavBar();
 
-// ── Accent colour from slide ───────────────────────────────────────────────────
-function parseRGBA(str) {
-  if (!str) return null;
-  const m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/);
-  return m ? [+m[1], +m[2], +m[3], m[4] !== undefined ? +m[4] : 1] : null;
-}
-function extractAccentColor() {
-  try {
-    const doc = frame.contentDocument;
-    if (!doc || !doc.body) return null;
-    let best = null, bestScore = 0, checked = 0;
-    for (const el of doc.querySelectorAll('*')) {
-      if (++checked > 400) break;
-      const rgba = parseRGBA(getComputedStyle(el).color);
-      if (!rgba) continue;
-      const [r, g, b, a] = rgba;
-      if (a < 0.5) continue;
-      const max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255;
-      const l = (max + min) / 2;
-      const s = max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
-      if (l > 0.38 && l < 0.92 && s > 0.45) {
-        const score = s * (0.5 - Math.abs(l - 0.65));
-        if (score > bestScore) { bestScore = score; best = `rgb(${r},${g},${b})`; }
-      }
-    }
-    return bestScore > 0 ? best : null;
-  } catch(_) { return null; }
-}
-frame.addEventListener('load', () => {
-  setTimeout(() => {
-    const accent = extractAccentColor();
-    counter.style.color = accent || 'rgba(255,255,255,0.45)';
-  }, 150);
-});
 </script>
 </body>
 </html>

@@ -150,6 +150,14 @@ window.FUCKSLIDES_DISABLED  = ${disabledJson};
       return;
     }
 
+    if (urlPath === '/logo.png') {
+      const logoPath = path.join(pkgDir, 'logo.png');
+      if (!fs.existsSync(logoPath)) { res.writeHead(404); res.end('Not found'); return; }
+      res.writeHead(200, { 'Content-Type': 'image/png' });
+      fs.createReadStream(logoPath).pipe(res);
+      return;
+    }
+
     const filePath = path.join(slidesDir, urlPath);
     if (!fs.existsSync(filePath)) {
       res.writeHead(404); res.end('Not found'); return;

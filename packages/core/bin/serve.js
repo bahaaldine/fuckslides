@@ -22,11 +22,13 @@ module.exports = function serve(config) {
   const slidesJson   = JSON.stringify(config.slides);
   const labelsJson   = JSON.stringify(config.labels || config.slides.map(s => s.replace('.html', '')));
   const nameJson     = JSON.stringify(config.name || 'presentation');
+  const titleJson    = JSON.stringify(config.title || config.name || 'presentation');
   const disabledJson = JSON.stringify(config.disabled || []);
   const configSnippet = `<script>
 window.FUCKSLIDES_SLIDES    = ${slidesJson};
 window.FUCKSLIDES_LABELS    = ${labelsJson};
 window.FUCKSLIDES_NAME      = ${nameJson};
+window.FUCKSLIDES_TITLE     = ${titleJson};
 window.FUCKSLIDES_DISABLED  = ${disabledJson};
 </script>`;
 

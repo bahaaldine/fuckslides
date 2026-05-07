@@ -28,6 +28,9 @@ switch (cmd) {
   case 'serve':
     require('./serve')(loadConfig(process.cwd()));
     break;
+  case 'build':
+    require('./build')(loadConfig(process.cwd()));
+    break;
   default:
     console.log(`
   fuckSlides — no-bullshit HTML presentations
@@ -35,6 +38,7 @@ switch (cmd) {
   Commands:
     fuckslides create <name>   Scaffold a new presentation
     fuckslides serve           Open presentation in browser with player
+    fuckslides build           Bundle to a portable static folder (dist/)
     fuckslides pdf             Export all slides to PDF
     fuckslides gif <slide>     Export a slide to animated GIF
 `);

@@ -16,7 +16,9 @@
       display: flex; align-items: center; gap: 0.25rem; z-index: 9999;
       background: rgba(34,36,44,0.82); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
       border: 1px solid rgba(255,255,255,0.12); border-radius: 40px; padding: 0.3rem 0.45rem;
+      transition: opacity 0.4s ease, transform 0.4s ease;
     }
+    .preso-nav.nav-hidden { opacity: 0; pointer-events: none; transform: translateY(6px); }
     .nav-btn {
       display: flex; align-items: center; justify-content: center;
       width: 30px; height: 30px; border-radius: 50%;
@@ -31,9 +33,17 @@
     .nav-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.1); margin: 0 0.1rem; }
     .nav-counter {
       font-family: 'Inter', -apple-system, sans-serif;
-      font-size: 0.62rem; font-weight: 600;
+      font-size: 0.62rem; font-weight: 800;
       color: rgba(255,255,255,0.45); letter-spacing: 0.06em;
       padding: 0 0.35rem; user-select: none;
+      transition: color 0.4s ease;
+    }
+    .nav-title {
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 0.58rem; font-weight: 600; letter-spacing: 0.06em;
+      color: rgba(255,255,255,0.28); padding: 0 0.3rem 0 0.15rem;
+      user-select: none; white-space: nowrap; max-width: 160px;
+      overflow: hidden; text-overflow: ellipsis;
     }
 
     /* ── Filmstrip ── */
@@ -298,7 +308,9 @@
   <textarea id="notes-textarea" placeholder="Add speaker notes for this slide…" spellcheck="true"></textarea>
 </div>
 
-<nav class="preso-nav">
+<nav class="preso-nav" id="preso-nav">
+  <span class="nav-title" id="nav-title"></span>
+  <div class="nav-sep"></div>
   <button class="nav-btn" id="btn-prev" title="Previous (←)">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L6 8l4 5"/></svg>
   </button>
@@ -1170,6 +1182,60 @@ window.addEventListener('resize', sizeFrame);
 sizeFrame();
 
 go(idx);
+
+// ── Nav title ─────────────────────────────────────────────────────────────────
+const navTitle = document.getElementById('nav-title');
+const presoNav = document.getElementById('preso-nav');
+const presoName = window.FUCKSLIDES_NAME || '';
+if (presoName) navTitle.textContent = presoName;
+else navTitle.parentNode.removeChild(navTitle.nextSibling); // remove sep if no title
+
+// ── Auto-hide toolbar ─────────────────────────────────────────────────────────
+let navHideTimer = null;
+function showNavBar() {
+  presoNav.classList.remove('nav-hidden');
+  clearTimeout(navHideTimer);
+  navHideTimer = setTimeout(() => presoNav.classList.add('nav-hidden'), 3000);
+}
+document.addEventListener('mousemove', showNavBar);
+presoNav.addEventListener('mouseenter', () => clearTimeout(navHideTimer));
+presoNav.addEventListener('mouseleave', showNavBar);
+showNavBar();
+
+// ── Accent colour from slide ───────────────────────────────────────────────────
+function parseRGBA(str) {
+  if (!str) return null;
+  const m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/);
+  return m ? [+m[1], +m[2], +m[3], m[4] !== undefined ? +m[4] : 1] : null;
+}
+function extractAccentColor() {
+  try {
+    const doc = frame.contentDocument;
+    if (!doc || !doc.body) return null;
+    let best = null, bestScore = 0, checked = 0;
+    for (const el of doc.querySelectorAll('*')) {
+      if (++checked > 400) break;
+      const rgba = parseRGBA(getComputedStyle(el).color);
+      if (!rgba) continue;
+      const [r, g, b, a] = rgba;
+      if (a < 0.5) continue;
+      const max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255;
+      const l = (max + min) / 2;
+      const s = max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+      if (l > 0.38 && l < 0.92 && s > 0.45) {
+        const score = s * (0.5 - Math.abs(l - 0.65));
+        if (score > bestScore) { bestScore = score; best = `rgb(${r},${g},${b})`; }
+      }
+    }
+    return bestScore > 0 ? best : null;
+  } catch(_) { return null; }
+}
+frame.addEventListener('load', () => {
+  setTimeout(() => {
+    const accent = extractAccentColor();
+    counter.style.color = accent || 'rgba(255,255,255,0.45)';
+  }, 150);
+});
 </script>
 </body>
 </html>

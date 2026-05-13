@@ -1,6 +1,6 @@
 # fuckSlides
 
-![fuckSlides](logo.png)
+<img src="logo.png" width="120" />
 
 **[bahaaldine.github.io/fuckslides](https://bahaaldine.github.io/fuckslides)**
 

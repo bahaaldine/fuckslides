@@ -107,6 +107,20 @@ window.FUCKSLIDES_DISABLED  = ${disabledJson};
       return;
     }
 
+    if (req.method === 'GET' && urlPath === '/api/available-slides') {
+      try {
+        const allHtml = fs.readdirSync(slidesDir)
+          .filter(f => f.endsWith('.html') && f !== 'index.html')
+          .sort();
+        const available = allHtml.filter(f => !config.slides.includes(f));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(available));
+      } catch (e) {
+        res.writeHead(500); res.end('[]');
+      }
+      return;
+    }
+
     if (req.method === 'GET' && urlPath === '/api/notes') {
       const notes = fs.existsSync(notesPath) ? fs.readFileSync(notesPath, 'utf8') : '{}';
       res.writeHead(200, { 'Content-Type': 'application/json' });

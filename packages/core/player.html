@@ -126,6 +126,72 @@
     .ov-thumb.disabled .ov-btn-disable { color: rgba(56,189,248,0.45); }
     .ov-thumb.disabled .ov-btn-disable:hover { color: #38BDF8; }
 
+    /* ── Shelf (slides not in flow) ── */
+    #ov-shelf {
+      flex-shrink: 0;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      background: rgba(8,10,16,0.7);
+      display: flex; flex-direction: column;
+      min-height: 0;
+    }
+    #ov-shelf.has-slides { min-height: 170px; }
+    .shelf-header {
+      flex-shrink: 0; display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.55rem 2rem 0.4rem;
+    }
+    .shelf-label {
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      color: rgba(255,255,255,0.2);
+    }
+    .shelf-count {
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 0.58rem; font-weight: 600;
+      color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.07);
+      border-radius: 10px; padding: 1px 7px;
+    }
+    .shelf-hint {
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 0.58rem; color: rgba(255,255,255,0.12); margin-left: auto;
+    }
+    .shelf-body { flex: 1; min-height: 0; overflow: hidden; display: flex; align-items: stretch; }
+    #shelf-track {
+      flex: 1; display: flex; align-items: center; gap: 10px;
+      padding: 8px 2rem 12px; overflow-x: auto; overflow-y: hidden;
+    }
+    #shelf-track::-webkit-scrollbar { height: 3px; }
+    #shelf-track::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+    #shelf-empty {
+      flex: 1; display: none; align-items: center; padding: 0 2rem 12px;
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 0.68rem; color: rgba(255,255,255,0.15);
+    }
+    .shelf-thumb {
+      flex-shrink: 0; position: relative; width: 136px; cursor: grab;
+      border-radius: 7px; border: 1px dashed rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.02); overflow: visible;
+      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    }
+    .shelf-thumb:hover { border-color: rgba(56,189,248,0.45); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+    .shelf-thumb.dragging { opacity: 0.3; cursor: grabbing; }
+    .shelf-thumb-inner { border-radius: 6px; overflow: hidden; }
+    .shelf-thumb-frame-wrap {
+      width: 100%; aspect-ratio: 16/9; overflow: hidden; position: relative;
+      pointer-events: none; border-radius: 6px 6px 0 0;
+    }
+    .shelf-thumb-frame-wrap iframe {
+      position: absolute; top: 0; left: 0; width: 1280px; height: 720px;
+      border: none; transform-origin: top left; pointer-events: none;
+    }
+    .shelf-thumb-label {
+      padding: 4px 7px; font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 0.55rem; font-weight: 600; color: rgba(255,255,255,0.28);
+      letter-spacing: 0.04em; border-top: 1px solid rgba(255,255,255,0.06);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    /* drop-zone highlight on the grid when shelf item is dragged over empty area */
+    #ov-grid.shelf-drag-over { outline: 2px dashed rgba(56,189,248,0.3); outline-offset: -6px; }
+
     /* ── Notes ── */
     #notes-panel {
       position: fixed; bottom: 0; left: 0; right: 0; height: 210px;
@@ -394,6 +460,18 @@
     </div>
   </div>
   <div class="ov-grid" id="ov-grid"></div>
+
+  <div id="ov-shelf">
+    <div class="shelf-header">
+      <span class="shelf-label">Not in flow</span>
+      <span class="shelf-count" id="shelf-count">0</span>
+      <span class="shelf-hint">drag into the grid above to add</span>
+    </div>
+    <div class="shelf-body">
+      <div id="shelf-track"></div>
+      <div id="shelf-empty">All slides are in the flow.</div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -534,7 +612,8 @@ function buildThumbs() {
   slides.forEach((slide, i) => appendThumb(slide, i));
 }
 
-function appendThumb(slide, i) {
+function buildThumbEl(slide, i) {
+  const label = labels[i] || slide.replace('.html', '');
   const thumb = document.createElement('div');
   thumb.className = 'ov-thumb';
   thumb.dataset.slide = slide;
@@ -564,7 +643,7 @@ function appendThumb(slide, i) {
 
   const lbl = document.createElement('div');
   lbl.className = 'ov-thumb-label';
-  lbl.innerHTML = `<span class="ov-thumb-name">${labels[i]}</span><span class="ov-thumb-num">${i + 1}</span><button class="ov-btn-disable" title="Toggle skip">⊘</button>`;
+  lbl.innerHTML = `<span class="ov-thumb-name">${label}</span><span class="ov-thumb-num">${i + 1}</span><button class="ov-btn-disable" title="Toggle skip">⊘</button>`;
 
   if (disabled.has(slide)) thumb.classList.add('disabled');
 
@@ -584,6 +663,11 @@ function appendThumb(slide, i) {
   thumb.addEventListener('drop',      onDrop);
   thumb.addEventListener('dragend',   onDragEnd);
 
+  return thumb;
+}
+
+function appendThumb(slide, i) {
+  const thumb = buildThumbEl(slide, i);
   ovGrid.appendChild(thumb);
   thumbObserver.observe(thumb);
 }
@@ -618,7 +702,7 @@ function setOvFocus(i) {
 
 function openOverview() {
   if (fsOpen) closeFilmstrip();
-  ovOpen = true; buildThumbs();
+  ovOpen = true; buildThumbs(); buildShelf();
   overview.style.display = 'flex';
   btnOv.classList.add('active');
   btnReset.classList.toggle('visible', !isDefaultOrder());
@@ -668,15 +752,17 @@ function toggleFilmstrip() { fsOpen ? closeFilmstrip() : openFilmstrip(); }
 
 // ── Drag and drop ─────────────────────────────────────────────────────────────
 let dragSrc = null;
+let isShelfDrag = false;
 
 function clearDropIndicators() {
   ovGrid.querySelectorAll('.drop-before,.drop-after').forEach(el => el.classList.remove('drop-before','drop-after'));
+  ovGrid.classList.remove('shelf-drag-over');
 }
-function onDragStart(e) { dragSrc = e.currentTarget; dragSrc.classList.add('dragging'); ovGrid.classList.add('is-dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragSrc.dataset.slide); }
+function onDragStart(e) { dragSrc = e.currentTarget; isShelfDrag = false; dragSrc.classList.add('dragging'); ovGrid.classList.add('is-dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragSrc.dataset.slide); }
 function onDragOver(e) {
   e.preventDefault();
-  if (!dragSrc || e.currentTarget === dragSrc) return;
-  e.dataTransfer.dropEffect = 'move';
+  if (!dragSrc || (!isShelfDrag && e.currentTarget === dragSrc)) return;
+  e.dataTransfer.dropEffect = isShelfDrag ? 'copy' : 'move';
   clearDropIndicators();
   const rect = e.currentTarget.getBoundingClientRect();
   e.currentTarget.classList.add(e.clientX < rect.left + rect.width / 2 ? 'drop-before' : 'drop-after');
@@ -684,8 +770,18 @@ function onDragOver(e) {
 function onDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drop-before','drop-after'); }
 function onDrop(e) {
   e.preventDefault(); e.stopPropagation();
-  if (!dragSrc || e.currentTarget === dragSrc) { clearDropIndicators(); return; }
+  if (!dragSrc) { clearDropIndicators(); return; }
   const target = e.currentTarget;
+
+  if (isShelfDrag) {
+    const rect = target.getBoundingClientRect();
+    const insertAfter = e.clientX >= rect.left + rect.width / 2;
+    addSlideFromShelf(dragSrc, target, insertAfter);
+    clearDropIndicators();
+    return;
+  }
+
+  if (target === dragSrc) { clearDropIndicators(); return; }
   const rect = target.getBoundingClientRect();
   const currentSlide = slides[idx];
   ovGrid.insertBefore(dragSrc, e.clientX < rect.left + rect.width / 2 ? target : target.nextSibling);
@@ -695,7 +791,148 @@ function onDrop(e) {
   refreshThumbCounters(); saveOrder(); saveToConfig();
   idx = slides.indexOf(currentSlide); go(idx);
 }
-function onDragEnd() { if (dragSrc) dragSrc.classList.remove('dragging'); ovGrid.classList.remove('is-dragging'); clearDropIndicators(); dragSrc = null; }
+function onDragEnd() { if (dragSrc) dragSrc.classList.remove('dragging'); ovGrid.classList.remove('is-dragging'); clearDropIndicators(); isShelfDrag = false; dragSrc = null; }
+
+// ── Shelf ─────────────────────────────────────────────────────────────────────
+const ovShelf   = document.getElementById('ov-shelf');
+const shelfTrack = document.getElementById('shelf-track');
+const shelfEmpty = document.getElementById('shelf-empty');
+const shelfCountEl = document.getElementById('shelf-count');
+let shelfBuilt = false;
+
+function buildShelf() {
+  // Always refresh so newly-added slides appear
+  fetch('/api/available-slides')
+    .then(r => r.json())
+    .then(available => {
+      shelfTrack.innerHTML = '';
+      shelfCountEl.textContent = available.length;
+      ovShelf.classList.toggle('has-slides', available.length > 0);
+      if (available.length === 0) {
+        shelfEmpty.style.display = 'flex';
+        shelfTrack.style.display = 'none';
+        return;
+      }
+      shelfEmpty.style.display = 'none';
+      shelfTrack.style.display = 'flex';
+      available.forEach(slide => {
+        const name = slide.replace('.html', '');
+        const thumb = document.createElement('div');
+        thumb.className = 'shelf-thumb';
+        thumb.dataset.slide = slide;
+        thumb.dataset.label = name;
+        thumb.draggable = true;
+
+        const inner = document.createElement('div');
+        inner.className = 'shelf-thumb-inner';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'shelf-thumb-frame-wrap';
+
+        const fr = document.createElement('iframe');
+        fr.setAttribute('scrolling', 'no');
+        fetch(slide)
+          .then(r => r.text())
+          .then(html => {
+            const noJs = html.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+            fr.srcdoc = noJs.replace('</head>', THUMB_FREEZE + '\n</head>');
+          })
+          .catch(() => { fr.src = slide; });
+
+        const ro = new ResizeObserver(entries => {
+          for (const e of entries) {
+            const scale = e.contentRect.width / 1280;
+            fr.style.transform = `scale(${scale})`;
+            wrap.style.height = (720 * scale) + 'px';
+          }
+          ro.disconnect();
+        });
+        wrap.appendChild(fr);
+        ro.observe(wrap);
+
+        const lbl = document.createElement('div');
+        lbl.className = 'shelf-thumb-label';
+        lbl.textContent = name;
+
+        inner.appendChild(wrap);
+        inner.appendChild(lbl);
+        thumb.appendChild(inner);
+
+        thumb.addEventListener('dragstart', e => {
+          dragSrc = thumb; isShelfDrag = true;
+          thumb.classList.add('dragging');
+          ovGrid.classList.add('is-dragging');
+          e.dataTransfer.effectAllowed = 'copy';
+          e.dataTransfer.setData('text/plain', slide);
+        });
+        thumb.addEventListener('dragend', () => {
+          thumb.classList.remove('dragging');
+          ovGrid.classList.remove('is-dragging');
+          clearDropIndicators();
+          isShelfDrag = false; dragSrc = null;
+        });
+
+        shelfTrack.appendChild(thumb);
+      });
+    })
+    .catch(() => {});
+}
+
+// Drop on empty grid space (no thumb under cursor)
+ovGrid.addEventListener('dragover', e => {
+  if (!isShelfDrag) return;
+  if (e.target.closest && e.target.closest('.ov-thumb')) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+  clearDropIndicators();
+  ovGrid.classList.add('shelf-drag-over');
+});
+ovGrid.addEventListener('dragleave', e => {
+  if (!ovGrid.contains(e.relatedTarget)) ovGrid.classList.remove('shelf-drag-over');
+});
+ovGrid.addEventListener('drop', e => {
+  if (!isShelfDrag) return;
+  if (e.target.closest && e.target.closest('.ov-thumb')) return;
+  e.preventDefault(); e.stopPropagation();
+  clearDropIndicators();
+  addSlideFromShelf(dragSrc, null, false);
+});
+
+function addSlideFromShelf(shelfEl, targetEl, insertAfter) {
+  const slide = shelfEl.dataset.slide;
+  const label = shelfEl.dataset.label || slide.replace('.html', '');
+
+  if (targetEl) {
+    const targetSlide = targetEl.dataset.slide;
+    const targetIdx = slides.indexOf(targetSlide);
+    const insertIdx = insertAfter ? targetIdx + 1 : targetIdx;
+    slides.splice(insertIdx, 0, slide);
+    labels.splice(insertIdx, 0, label);
+    const newThumb = buildThumbEl(slide, insertIdx);
+    ovGrid.insertBefore(newThumb, insertAfter ? targetEl.nextSibling : targetEl);
+    thumbObserver.observe(newThumb);
+  } else {
+    slides.push(slide);
+    labels.push(label);
+    const newThumb = buildThumbEl(slide, slides.length - 1);
+    ovGrid.appendChild(newThumb);
+    thumbObserver.observe(newThumb);
+  }
+
+  shelfEl.remove();
+  // Rebuild shelf count
+  const remaining = shelfTrack.querySelectorAll('.shelf-thumb').length;
+  shelfCountEl.textContent = remaining;
+  ovShelf.classList.toggle('has-slides', remaining > 0);
+  if (remaining === 0) {
+    shelfEmpty.style.display = 'flex';
+    shelfTrack.style.display = 'none';
+  }
+
+  refreshThumbCounters();
+  saveOrder();
+  saveToConfig();
+}
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
 btnReset.addEventListener('click', () => {

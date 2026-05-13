@@ -1,6 +1,6 @@
 # fuckSlides
 
-**[github.com/bahaaldine/fuckslides](https://github.com/bahaaldine/fuckslides)**
+**[bahaaldine.github.io/fuckslides](https://bahaaldine.github.io/fuckslides)**
 
 A no-bullshit HTML presentation framework. Your slides are plain HTML files. fuckSlides provides everything around them — a presenter player, keyboard navigation, slide overview, filmstrip, in-browser editor, speaker notes, PDF export, and animated GIF export.
 

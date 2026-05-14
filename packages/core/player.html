@@ -9,7 +9,18 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100vh; overflow: hidden; background: #22242C; }
 
-    #slide-frame { position: absolute; width: 1280px; height: 720px; border: none; display: block; transform-origin: top left; }
+    #slide-wrapper { position: absolute; width: 1280px; height: 720px; transform-origin: top left; }
+    #slide-frame { position: absolute; inset: 0; width: 1280px; height: 720px; border: none; display: block; }
+    #transition-fade { position: absolute; inset: 0; background: #22242C; opacity: 0; transition: opacity 0.18s ease; pointer-events: none; z-index: 6; }
+    #interaction-overlay { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
+    #interaction-overlay.active { pointer-events: auto; cursor: crosshair; }
+    #laser-dot { position: absolute; width: 32px; height: 32px; border-radius: 50%; background: radial-gradient(circle, rgba(255,40,40,0.95) 0%, rgba(255,40,40,0.4) 55%, transparent 75%); box-shadow: 0 0 24px rgba(255,40,40,0.55); display: none; pointer-events: none; z-index: 10; transform: translate(-50%,-50%); }
+    #draw-canvas { position: absolute; inset: 0; width: 1280px; height: 720px; pointer-events: none; z-index: 9; display: none; }
+    .nav-timer { font-family: 'SF Mono','Fira Code',monospace; font-size: 0.75rem; font-weight: 600; color: rgba(255,255,255,0.3); padding: 0 0.3rem; user-select: none; cursor: pointer; min-width: 44px; text-align: center; border-radius: 6px; transition: color 0.2s; }
+    .nav-timer:hover { color: rgba(255,255,255,0.6); }
+    .nav-timer.running { color: #34D399; }
+    .nav-timer.paused { color: rgba(251,146,60,0.85); }
+    #mode-toast { position: fixed; top: 1.1rem; left: 50%; transform: translateX(-50%); background: rgba(20,22,30,0.9); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px 16px; font-family: 'Inter',-apple-system,sans-serif; font-size: 0.68rem; font-weight: 600; color: rgba(255,255,255,0.6); letter-spacing: 0.06em; display: none; z-index: 9998; pointer-events: none; }
 
     .preso-nav {
       position: fixed; bottom: 1.5rem; right: 1.5rem;
@@ -366,7 +377,14 @@
 </head>
 <body>
 
-<iframe id="slide-frame"></iframe>
+<div id="slide-wrapper">
+  <iframe id="slide-frame"></iframe>
+  <div id="transition-fade"></div>
+  <div id="interaction-overlay"></div>
+  <div id="laser-dot"></div>
+  <canvas id="draw-canvas" width="1280" height="720"></canvas>
+</div>
+<div id="mode-toast"></div>
 
 <div id="filmstrip"><div id="filmstrip-track"></div></div>
 
@@ -385,6 +403,8 @@
 <nav class="preso-nav" id="preso-nav">
   <img class="nav-logo" src="/logo.png" alt="">
   <span class="nav-title" id="nav-title"></span>
+  <div class="nav-sep"></div>
+  <span class="nav-timer" id="nav-timer" title="C start/pause · R reset">00:00</span>
   <div class="nav-sep"></div>
   <button class="nav-btn" id="btn-prev" title="Previous (←)">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L6 8l4 5"/></svg>
@@ -406,6 +426,9 @@
   <div class="nav-sep"></div>
   <button class="nav-btn" id="btn-notes" title="Speaker notes (N)">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="10" rx="1.5"/><path d="M5 6h6M5 8.5h4"/></svg>
+  </button>
+  <button class="nav-btn" id="btn-presenter" title="Presenter view (P)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="9" height="7" rx="1"/><rect x="6" y="9" width="9" height="6" rx="1"/><path d="M3 9v1M5 9v1"/></svg>
   </button>
 </nav>
 
@@ -500,7 +523,9 @@ function loadOrder() {
 function saveOrder() { localStorage.setItem(LS_KEY, JSON.stringify(slides)); }
 function isDefaultOrder() { return slides.every((s, i) => s === SLIDES_DEFAULT[i]); }
 
-const frame     = document.getElementById('slide-frame');
+const slideWrapper  = document.getElementById('slide-wrapper');
+const frame         = document.getElementById('slide-frame');
+const transitionFade = document.getElementById('transition-fade');
 const counter   = document.getElementById('nav-counter');
 const btnPrev   = document.getElementById('btn-prev');
 const btnNext   = document.getElementById('btn-next');
@@ -554,7 +579,7 @@ const fsTrack   = document.getElementById('filmstrip-track');
 
 let idx = parseInt(location.hash.slice(1)) || 0;
 let ovOpen = false, fsOpen = false, thumbsBuilt = false, fsBuilt = false, ovFocus = 0;
-let navLocked = false;
+let navLocked = false, transitionEnabled = true, firstLoad = true;
 if (idx < 0 || idx >= slides.length) idx = 0;
 
 function go(newIdx) {
@@ -567,15 +592,34 @@ function go(newIdx) {
   }
   idx = i;
   location.replace('#' + idx);
-  frame.src = slides[idx];
-  const active = slides.filter(s => !disabled.has(s));
-  const activeIdx = active.indexOf(slides[idx]);
-  counter.textContent = (activeIdx + 1) + ' / ' + active.length;
-  btnPrev.disabled = activeIdx <= 0;
-  btnNext.disabled = activeIdx >= active.length - 1;
-  if (thumbsBuilt) updateThumbHighlight();
-  if (fsBuilt) updateFilmstripHighlight();
-  if (notesOpen) loadNotesForSlide();
+
+  const loadSlide = () => {
+    if (window.FUCKSLIDES_EXPORT && window.FUCKSLIDES_CONTENTS) {
+      frame.srcdoc = window.FUCKSLIDES_CONTENTS[slides[idx]] || '';
+    } else {
+      frame.src = slides[idx];
+    }
+    const active = slides.filter(s => !disabled.has(s));
+    const activeIdx = active.indexOf(slides[idx]);
+    counter.textContent = (activeIdx + 1) + ' / ' + active.length;
+    btnPrev.disabled = activeIdx <= 0;
+    btnNext.disabled = activeIdx >= active.length - 1;
+    if (thumbsBuilt) updateThumbHighlight();
+    if (fsBuilt) updateFilmstripHighlight();
+    if (notesOpen) loadNotesForSlide();
+    broadcastPresenterState();
+  };
+
+  if (transitionEnabled && !firstLoad) {
+    transitionFade.style.opacity = '1';
+    setTimeout(() => {
+      loadSlide();
+      requestAnimationFrame(() => requestAnimationFrame(() => { transitionFade.style.opacity = '0'; }));
+    }, 160);
+  } else {
+    loadSlide();
+    firstLoad = false;
+  }
 }
 
 function toggleFullscreen() {
@@ -950,7 +994,17 @@ function handleKey(key) {
   if (key === 'g' || key === 'G') { toggleOverview(); return; }
   if (key === 't' || key === 'T') { toggleFilmstrip(); return; }
   if (key === 'n' || key === 'N') { toggleNotes(); return; }
-  if (key === 'Escape') { if (ovOpen) { closeOverview(); return; } if (fsOpen) { closeFilmstrip(); return; } }
+  if (key === 'p' || key === 'P') { openPresenterView(); return; }
+  if (key === 'l' || key === 'L') { toggleLaser(); return; }
+  if (key === 'd' || key === 'D') { if (!ovOpen) { toggleDraw(); return; } }
+  if (key === 'c' || key === 'C') { timerToggle(); return; }
+  if (key === 'r' || key === 'R') { timerReset(); return; }
+  if (key === 'z' || key === 'Z') { transitionEnabled = !transitionEnabled; showToast(transitionEnabled ? 'Transitions on' : 'Transitions off'); return; }
+  if (key === 'Escape') {
+    if (laserMode) { deactivateLaser(); return; }
+    if (drawMode)  { deactivateDraw();  return; }
+    if (ovOpen) { closeOverview(); return; } if (fsOpen) { closeFilmstrip(); return; }
+  }
   if (ovOpen) {
     const cols = getGridCols();
     if (key === 'ArrowRight') { setOvFocus(Math.min(slides.length - 1, ovFocus + 1)); return; }
@@ -993,6 +1047,7 @@ btnNext.addEventListener('click', () => go(idx + 1));
 btnFs.addEventListener('click', () => toggleFullscreen());
 btnOv.addEventListener('click', () => toggleOverview());
 btnFs2.addEventListener('click', () => toggleFilmstrip());
+document.getElementById('btn-presenter').addEventListener('click', openPresenterView);
 overview.addEventListener('click', e => { if (e.target === overview) closeOverview(); });
 
 // ── Editor ────────────────────────────────────────────────────────────────────
@@ -1418,12 +1473,11 @@ btnNotes.addEventListener('click', toggleNotes);
 function sizeFrame() {
   const vw = window.innerWidth, vh = window.innerHeight;
   const ratio = 16 / 9;
-  let cw;
-  if (vw / vh > ratio) { cw = vh * ratio; } else { cw = vw; }
+  const cw = vw / vh > ratio ? vh * ratio : vw;
   const scale = cw / 1280;
-  frame.style.transform = `scale(${scale})`;
-  frame.style.left = ((vw - 1280 * scale) / 2) + 'px';
-  frame.style.top  = ((vh -  720 * scale) / 2) + 'px';
+  slideWrapper.style.transform = `scale(${scale})`;
+  slideWrapper.style.left = ((vw - 1280 * scale) / 2) + 'px';
+  slideWrapper.style.top  = ((vh -  720 * scale) / 2) + 'px';
 }
 window.addEventListener('resize', sizeFrame);
 sizeFrame();
@@ -1436,6 +1490,111 @@ const presoNav = document.getElementById('preso-nav');
 const presoDisplayTitle = window.FUCKSLIDES_TITLE || window.FUCKSLIDES_NAME || '';
 if (presoDisplayTitle) navTitle.textContent = presoDisplayTitle;
 else navTitle.parentNode.removeChild(navTitle.nextSibling); // remove sep if no title
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+const modeToast = document.getElementById('mode-toast');
+let modeToastTimer = null;
+function showToast(text, persist) {
+  modeToast.textContent = text; modeToast.style.display = 'block';
+  clearTimeout(modeToastTimer);
+  if (!persist) modeToastTimer = setTimeout(() => { modeToast.style.display = 'none'; }, 1800);
+}
+function hideToast() { clearTimeout(modeToastTimer); modeToast.style.display = 'none'; }
+
+// ── Timer ─────────────────────────────────────────────────────────────────────
+const navTimerEl = document.getElementById('nav-timer');
+let timerRunning = false, timerOffset = 0, timerStart = 0, timerInterval = null;
+
+function timerTick() {
+  const ms = timerOffset + (Date.now() - timerStart);
+  const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+  navTimerEl.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+function timerToggle() {
+  if (timerRunning) {
+    timerOffset += Date.now() - timerStart;
+    clearInterval(timerInterval); timerInterval = null; timerRunning = false;
+    navTimerEl.classList.remove('running'); navTimerEl.classList.add('paused');
+  } else {
+    timerStart = Date.now();
+    timerInterval = setInterval(timerTick, 500); timerRunning = true;
+    navTimerEl.classList.remove('paused'); navTimerEl.classList.add('running');
+  }
+}
+function timerReset() {
+  clearInterval(timerInterval); timerInterval = null;
+  timerRunning = false; timerOffset = 0;
+  navTimerEl.textContent = '00:00'; navTimerEl.classList.remove('running','paused');
+}
+navTimerEl.addEventListener('click', timerToggle);
+
+// ── Laser & Draw ──────────────────────────────────────────────────────────────
+const laserDot = document.getElementById('laser-dot');
+const drawCanvas = document.getElementById('draw-canvas');
+const interactionOverlay = document.getElementById('interaction-overlay');
+const drawCtx = drawCanvas.getContext('2d');
+let laserMode = false, drawMode = false, isDrawing = false;
+
+function screenToSlide(e) {
+  const rect = slideWrapper.getBoundingClientRect();
+  return { x: (e.clientX - rect.left) / rect.width * 1280, y: (e.clientY - rect.top) / rect.height * 720 };
+}
+function activateLaser() {
+  laserMode = true; drawMode = false; isDrawing = false;
+  laserDot.style.display = 'block'; drawCanvas.style.display = 'none';
+  interactionOverlay.classList.add('active');
+  showToast('Laser pointer · L to exit', true);
+}
+function deactivateLaser() {
+  laserMode = false; laserDot.style.display = 'none';
+  interactionOverlay.classList.remove('active'); hideToast();
+}
+function toggleLaser() { laserMode ? deactivateLaser() : activateLaser(); if (drawMode) deactivateDraw(); }
+function activateDraw() {
+  drawMode = true; laserMode = false;
+  drawCanvas.style.display = 'block'; laserDot.style.display = 'none';
+  interactionOverlay.classList.add('active');
+  showToast('Draw mode · D to clear & exit', true);
+}
+function deactivateDraw() {
+  drawMode = false; drawCanvas.style.display = 'none';
+  drawCtx.clearRect(0, 0, 1280, 720);
+  interactionOverlay.classList.remove('active'); hideToast();
+}
+function toggleDraw() { drawMode ? deactivateDraw() : activateDraw(); if (laserMode) deactivateLaser(); }
+
+interactionOverlay.addEventListener('mousemove', e => {
+  const { x, y } = screenToSlide(e);
+  if (laserMode) { laserDot.style.left = x + 'px'; laserDot.style.top = y + 'px'; }
+  if (drawMode && isDrawing) { drawCtx.lineTo(x, y); drawCtx.stroke(); }
+});
+interactionOverlay.addEventListener('mousedown', e => {
+  if (!drawMode) return;
+  isDrawing = true;
+  const { x, y } = screenToSlide(e);
+  drawCtx.beginPath(); drawCtx.moveTo(x, y);
+  drawCtx.strokeStyle = 'rgba(255,55,55,0.88)'; drawCtx.lineWidth = 5;
+  drawCtx.lineCap = 'round'; drawCtx.lineJoin = 'round';
+});
+interactionOverlay.addEventListener('mouseup',    () => { isDrawing = false; });
+interactionOverlay.addEventListener('mouseleave', () => { isDrawing = false; });
+
+// ── Presenter view ────────────────────────────────────────────────────────────
+let presenterChannel = null;
+
+function openPresenterView() {
+  window.open('/presenter', 'fuckslides-presenter', 'width=1440,height=820,resizable=yes');
+  if (!presenterChannel) presenterChannel = new BroadcastChannel('fuckslides-presenter');
+  setTimeout(broadcastPresenterState, 600);
+}
+function broadcastPresenterState() {
+  if (!presenterChannel) return;
+  presenterChannel.postMessage({
+    type: 'state', idx, slides, labels,
+    notes: allNotes,
+    timerRunning, timerMs: timerRunning ? timerOffset + (Date.now() - timerStart) : timerOffset,
+  });
+}
 
 // ── Auto-hide toolbar ─────────────────────────────────────────────────────────
 let navHideTimer = null;

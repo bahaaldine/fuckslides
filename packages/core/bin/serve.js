@@ -157,6 +157,13 @@ window.FUCKSLIDES_DISABLED  = ${disabledJson};
       return;
     }
 
+    if (urlPath === '/presenter') {
+      const presenterPath = path.join(pkgDir, 'presenter.html');
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      fs.createReadStream(presenterPath).pipe(res);
+      return;
+    }
+
     if (urlPath === '/js/fuckslides.js') {
       const jsPath = path.join(pkgDir, 'js', 'fuckslides.js');
       res.writeHead(200, { 'Content-Type': 'application/javascript' });

@@ -15,6 +15,12 @@ function loadConfig(cwd) {
   return require(cfgPath);
 }
 
+// parse --template flag for add-slide
+function getFlag(flag) {
+  const i = args.indexOf(flag);
+  return i >= 0 ? args[i + 1] : undefined;
+}
+
 switch (cmd) {
   case 'create':
     require('./create')(args[0]);
@@ -31,6 +37,17 @@ switch (cmd) {
   case 'serve':
     require('./serve')(loadConfig(process.cwd()));
     break;
+  case 'export': {
+    const outArg = args[0] && !args[0].startsWith('-') ? args[0] : undefined;
+    require('./export')(loadConfig(process.cwd()), outArg ? path.join(process.cwd(), outArg) : undefined);
+    break;
+  }
+  case 'add-slide':
+    require('./add-slide')(args[0], getFlag('--template'));
+    break;
+  case 'publish':
+    require('./publish')(loadConfig(process.cwd()));
+    break;
   default:
     console.log(`
   fuckSlides — no-bullshit HTML presentations
@@ -41,5 +58,8 @@ switch (cmd) {
     fuckslides serve                  Open presentation in browser with player
     fuckslides pdf                    Export all slides to PDF
     fuckslides gif <slide>            Export a slide to animated GIF
+    fuckslides export [output.html]   Bundle into a single self-contained HTML file
+    fuckslides add-slide <name>       Add a new slide (--template title|stat|quote|split|bullets|cover)
+    fuckslides publish                Deploy to GitHub Pages
 `);
 }

@@ -16,13 +16,18 @@
   "scripts": {
     "test": "echo ok"
   },
-  "keywords": ["presentation", "slides", "html"],
+  "keywords": [
+    "presentation",
+    "slides",
+    "html"
+  ],
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": ">=0.30.0",
     "gif-encoder-2": "^1.0.5",
     "pdf-lib": "^1.17.1",
     "pngjs": "^7.0.0",
+    "pptxgenjs": "^4.0.1",
     "puppeteer": "^24.42.0"
   }
 }

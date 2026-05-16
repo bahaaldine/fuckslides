@@ -31,6 +31,9 @@ switch (cmd) {
   case 'pdf':
     require('./pdf')(loadConfig(process.cwd()));
     break;
+  case 'pptx':
+    require('./pptx')(loadConfig(process.cwd()));
+    break;
   case 'gif':
     require('./gif')(loadConfig(process.cwd()), args[0]);
     break;
@@ -57,6 +60,7 @@ switch (cmd) {
     fuckslides import <file …>        Convert PDF or images to slides (requires ANTHROPIC_API_KEY)
     fuckslides serve                  Open presentation in browser with player
     fuckslides pdf                    Export all slides to PDF
+    fuckslides pptx                   Export all slides to PowerPoint (.pptx)
     fuckslides gif <slide>            Export a slide to animated GIF
     fuckslides export [output.html]   Bundle into a single self-contained HTML file
     fuckslides add-slide <name>       Add a new slide (--template title|stat|quote|split|bullets|cover)

@@ -14,6 +14,33 @@ const GLOBAL_INJECT = `
 const WIDTH  = 1280;
 const HEIGHT = 720;
 
+async function launchBrowser() {
+  const launchOpts = { headless: true };
+
+  // Allow users to point Puppeteer at an existing Chrome install. Useful when
+  // the bundled-Chrome download was skipped or unavailable (corporate proxies,
+  // restricted-network CI runners, sandboxed environments, etc.).
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+
+  try {
+    return await puppeteer.launch(launchOpts);
+  } catch (err) {
+    console.error('\n❌  Failed to launch Chrome.\n');
+    console.error(err.message + '\n');
+    console.error('Troubleshooting:');
+    console.error('  • If Puppeteer\'s bundled-Chrome download was skipped or blocked,');
+    console.error('    point Puppeteer at an existing Chrome with PUPPETEER_EXECUTABLE_PATH,');
+    console.error('    e.g.:');
+    console.error('      export PUPPETEER_EXECUTABLE_PATH="$(which google-chrome)"            # Linux');
+    console.error('      export PUPPETEER_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"   # macOS');
+    console.error('  • Or re-run npm install with PUPPETEER_SKIP_DOWNLOAD=false to fetch');
+    console.error('    the bundled Chrome.\n');
+    process.exit(1);
+  }
+}
+
 module.exports = async function exportPdf(config) {
   const cwd      = process.cwd();
   const slidesDir = path.join(cwd, config.slidesDir || 'slides');
@@ -22,7 +49,7 @@ module.exports = async function exportPdf(config) {
   const overrides = config.pdfOverrides || {};
 
   console.log('\nLaunching browser…\n');
-  const browser  = await puppeteer.launch({ headless: true });
+  const browser  = await launchBrowser();
   const pdfPaths = [];
 
   for (let i = 0; i < config.slides.length; i++) {

@@ -3,17 +3,60 @@
 const fs   = require('fs');
 const path = require('path');
 
+const MIME_MAP = {
+  '.svg':  'image/svg+xml',
+  '.png':  'image/png',
+  '.jpg':  'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif':  'image/gif',
+  '.webp': 'image/webp',
+  '.ico':  'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2':'font/woff2',
+};
+
+// Inline all relative src="..." and url("...") references as base64 data URIs.
+// slideDir is the directory containing the slide HTML file.
+function inlineAssets(html, slideDir) {
+  // src="..." and src='...' — skip http/https/data/# references
+  html = html.replace(/\bsrc=["']([^"']+)["']/g, (match, ref) => {
+    if (/^(https?:|data:|#|\/\/)/.test(ref)) return match;
+    const abs = path.resolve(slideDir, ref);
+    if (!fs.existsSync(abs)) return match;
+    const ext  = path.extname(abs).toLowerCase();
+    const mime = MIME_MAP[ext] || 'application/octet-stream';
+    const b64  = fs.readFileSync(abs).toString('base64');
+    return `src="data:${mime};base64,${b64}"`;
+  });
+
+  // url("...") and url('...') inside CSS
+  html = html.replace(/url\(["']?([^"')]+)["']?\)/g, (match, ref) => {
+    if (/^(https?:|data:|#|\/\/)/.test(ref)) return match;
+    const abs = path.resolve(slideDir, ref);
+    if (!fs.existsSync(abs)) return match;
+    const ext  = path.extname(abs).toLowerCase();
+    const mime = MIME_MAP[ext] || 'application/octet-stream';
+    const b64  = fs.readFileSync(abs).toString('base64');
+    return `url("data:${mime};base64,${b64}")`;
+  });
+
+  return html;
+}
+
 module.exports = async function exportPresentation(config, outputPath) {
   const cwd      = process.cwd();
   const slidesDir = path.join(cwd, config.slidesDir || 'slides');
   const pkgDir   = path.join(__dirname, '..');
   const out      = outputPath || path.join(cwd, (config.name || 'presentation') + '.html');
 
-  // Read all slide HTML
+  // Read all slide HTML and inline their local assets
   const slideContents = {};
   for (const slide of config.slides) {
     const p = path.join(slidesDir, slide);
-    if (fs.existsSync(p)) slideContents[slide] = fs.readFileSync(p, 'utf8');
+    if (fs.existsSync(p)) {
+      const raw = fs.readFileSync(p, 'utf8');
+      slideContents[slide] = inlineAssets(raw, slidesDir);
+    }
   }
 
   // Inline fuckslides.js
@@ -48,7 +91,6 @@ window.FUCKSLIDES_CONTENTS  = ${JSON.stringify(slideContents)};
   // Swap logo src to data URI
   if (logoDat) html = html.replace(/src="\/logo\.png"/g, `src="${logoDat}"`);
 
-  // Remove api-dependent features in export (save, save-order — they 404 silently already)
   fs.writeFileSync(out, html, 'utf8');
 
   const size = (fs.statSync(out).size / 1024).toFixed(0);

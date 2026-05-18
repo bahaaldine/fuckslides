@@ -12,15 +12,23 @@ No build step. No lock-in. Every slide is just a file you can open in a browser.
 
 ## Install
 
-```bash
-npm install -g fuck-slides
-```
-
-Or use without installing:
+The package isn't published to npm yet, so install from source:
 
 ```bash
-npx fuck-slides create my-talk
+git clone https://github.com/bahaaldine/fuckslides.git
+cd fuckslides
+npm install
+npm link --workspace=packages/core
 ```
+
+That exposes `fuckslides` globally. Verify with:
+
+```bash
+fuckslides
+# prints the help text with create / serve / pdf / gif
+```
+
+> Once published to npm this becomes `npm install -g fuck-slides` (or `npx fuck-slides create my-talk` without installing).
 
 ---
 

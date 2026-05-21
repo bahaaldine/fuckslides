@@ -18,22 +18,28 @@ module.exports = function serve(config) {
   const pkgDir    = path.join(__dirname, '..');
   const PORT      = config.port || 3000;
 
-  // Inject slide manifest into player.html so the player knows the deck
-  const slidesJson   = JSON.stringify(config.slides);
-  const labelsJson   = JSON.stringify(config.labels || config.slides.map(s => s.replace('.html', '')));
-  const nameJson     = JSON.stringify(config.name || 'presentation');
-  const titleJson    = JSON.stringify(config.title || config.name || 'presentation');
-  const disabledJson = JSON.stringify(config.disabled || []);
-  const configSnippet = `<script>
+  const playerTemplate = fs.readFileSync(path.join(pkgDir, 'player.html'), 'utf8');
+  const cfgPath   = path.join(cwd, 'fuckslides.config.js');
+  const notesPath = path.join(cwd, 'notes.json');
+
+  // Rebuild the injected player HTML from current config
+  let slidesJson, playerHtml;
+  function buildPlayer() {
+    slidesJson = JSON.stringify(config.slides);
+    const labelsJson   = JSON.stringify(config.labels || config.slides.map(s => s.replace('.html', '')));
+    const nameJson     = JSON.stringify(config.name || 'presentation');
+    const titleJson    = JSON.stringify(config.title || config.name || 'presentation');
+    const disabledJson = JSON.stringify(config.disabled || []);
+    const configSnippet = `<script>
 window.FUCKSLIDES_SLIDES    = ${slidesJson};
 window.FUCKSLIDES_LABELS    = ${labelsJson};
 window.FUCKSLIDES_NAME      = ${nameJson};
 window.FUCKSLIDES_TITLE     = ${titleJson};
 window.FUCKSLIDES_DISABLED  = ${disabledJson};
 </script>`;
-
-  const playerTemplate = fs.readFileSync(path.join(pkgDir, 'player.html'), 'utf8');
-  const playerHtml     = playerTemplate.replace('</head>', configSnippet + '\n</head>');
+    playerHtml = playerTemplate.replace('</head>', configSnippet + '\n</head>');
+  }
+  buildPlayer();
 
   // Inject slide manifest into each slide too (for standalone keyboard nav)
   function injectSlideManifest(html) {
@@ -41,8 +47,27 @@ window.FUCKSLIDES_DISABLED  = ${disabledJson};
     return html.includes('</head>') ? html.replace('</head>', tag + '\n</head>') : html;
   }
 
-  const cfgPath   = path.join(cwd, 'fuckslides.config.js');
-  const notesPath = path.join(cwd, 'notes.json');
+  // SSE: push reload events to connected browsers
+  const sseClients = new Set();
+  function broadcast(event, data) {
+    const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    for (const client of sseClients) client.write(msg);
+  }
+
+  // Watch fuckslides.config.js and hot-reload on change
+  let reloadTimer = null;
+  fs.watch(cfgPath, () => {
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(() => {
+      try {
+        delete require.cache[require.resolve(cfgPath)];
+        const newCfg = require(cfgPath);
+        Object.assign(config, newCfg);
+        buildPlayer();
+        broadcast('reload', {});
+      } catch (e) {}
+    }, 100);
+  });
 
   const server = http.createServer((req, res) => {
     let urlPath = req.url.split('?')[0];
@@ -104,6 +129,18 @@ window.FUCKSLIDES_DISABLED  = ${disabledJson};
           res.end(JSON.stringify({ ok: false, error: e.message }));
         }
       });
+      return;
+    }
+
+    if (req.method === 'GET' && urlPath === '/api/sse') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      res.write(':\n\n');
+      sseClients.add(res);
+      req.on('close', () => sseClients.delete(res));
       return;
     }
 

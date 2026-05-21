@@ -43,6 +43,18 @@ function inlineAssets(html, slideDir) {
   return html;
 }
 
+function inlineIframes(html, baseDir) {
+  return html.replace(/<iframe\b([^>]*?)\bsrc=(["'])([^"'#][^"']*)\2([^>]*)>/gi, (m, before, q, src, after) => {
+    if (src.startsWith('data:') || /^https?:\/\//.test(src) || src.startsWith('//')) return m;
+    const abs = path.resolve(baseDir, src);
+    if (!fs.existsSync(abs)) return m;
+    let content = fs.readFileSync(abs, 'utf8');
+    content = inlineAssets(content, path.dirname(abs));
+    const srcdoc = content.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    return `<iframe${before}srcdoc="${srcdoc}"${after}>`;
+  });
+}
+
 module.exports = async function exportPresentation(config, outputPath) {
   const cwd      = process.cwd();
   const slidesDir = path.join(cwd, config.slidesDir || 'slides');
@@ -55,7 +67,7 @@ module.exports = async function exportPresentation(config, outputPath) {
     const p = path.join(slidesDir, slide);
     if (fs.existsSync(p)) {
       const raw = fs.readFileSync(p, 'utf8');
-      slideContents[slide] = inlineAssets(raw, slidesDir);
+      slideContents[slide] = inlineAssets(inlineIframes(raw, slidesDir), slidesDir);
     }
   }
 
@@ -72,21 +84,24 @@ module.exports = async function exportPresentation(config, outputPath) {
   // Read player template
   let html = fs.readFileSync(path.join(pkgDir, 'player.html'), 'utf8');
 
-  // Inject config + slide contents
+  function safeJson(val) {
+    return JSON.stringify(val).replace(/<\/(script)/gi, '<\\/$1');
+  }
+
   const snippet = `<script>
-window.FUCKSLIDES_SLIDES    = ${JSON.stringify(config.slides)};
-window.FUCKSLIDES_LABELS    = ${JSON.stringify(config.labels || config.slides.map(s => s.replace('.html','')))};
-window.FUCKSLIDES_NAME      = ${JSON.stringify(config.name || 'presentation')};
-window.FUCKSLIDES_TITLE     = ${JSON.stringify(config.title || config.name || 'presentation')};
-window.FUCKSLIDES_DISABLED  = ${JSON.stringify(config.disabled || [])};
+window.FUCKSLIDES_SLIDES    = ${safeJson(config.slides)};
+window.FUCKSLIDES_LABELS    = ${safeJson(config.labels || config.slides.map(s => s.replace('.html','')))};
+window.FUCKSLIDES_NAME      = ${safeJson(config.name || 'presentation')};
+window.FUCKSLIDES_TITLE     = ${safeJson(config.title || config.name || 'presentation')};
+window.FUCKSLIDES_DISABLED  = ${safeJson(config.disabled || [])};
 window.FUCKSLIDES_EXPORT    = true;
-window.FUCKSLIDES_CONTENTS  = ${JSON.stringify(slideContents)};
+window.FUCKSLIDES_CONTENTS  = ${safeJson(slideContents)};
 </script>`;
 
   html = html.replace('</head>', snippet + '\n</head>');
 
   // Inline fuckslides.js and remove external src reference
-  if (fsJs) html = html.replace(/<script src="\/js\/fuckslides\.js"><\/script>/g, `<script>${fsJs}</script>`);
+  if (fsJs) html = html.replace(/<script src="\/js\/fuckslides\.js"><\/script>/g, `<script>${fsJs}<\/script>`);
 
   // Swap logo src to data URI
   if (logoDat) html = html.replace(/src="\/logo\.png"/g, `src="${logoDat}"`);

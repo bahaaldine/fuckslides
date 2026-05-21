@@ -1416,7 +1416,7 @@ let allNotes  = {};
 let notesSaveTimer = null;
 let notesSaveMsgTimer = null;
 
-fetch('/api/notes').then(r => r.json()).then(d => { allNotes = d; }).catch(() => {});
+if (!window.FUCKSLIDES_EXPORT) fetch('/api/notes').then(r => r.json()).then(d => { allNotes = d; }).catch(() => {});
 
 function loadNotesForSlide() {
   const file = slides[idx];
@@ -1481,6 +1481,8 @@ function sizeFrame() {
 }
 window.addEventListener('resize', sizeFrame);
 sizeFrame();
+
+let presenterChannel = null;
 
 go(idx);
 
@@ -1580,8 +1582,6 @@ interactionOverlay.addEventListener('mouseup',    () => { isDrawing = false; });
 interactionOverlay.addEventListener('mouseleave', () => { isDrawing = false; });
 
 // ── Presenter view ────────────────────────────────────────────────────────────
-let presenterChannel = null;
-
 function openPresenterView() {
   window.open('/presenter', 'fuckslides-presenter', 'width=1440,height=820,resizable=yes');
   if (!presenterChannel) presenterChannel = new BroadcastChannel('fuckslides-presenter');
@@ -1607,6 +1607,12 @@ document.addEventListener('mousemove', showNavBar);
 presoNav.addEventListener('mouseenter', () => clearTimeout(navHideTimer));
 presoNav.addEventListener('mouseleave', showNavBar);
 showNavBar();
+
+// ── Config hot-reload ─────────────────────────────────────────────────────────
+if (!window.FUCKSLIDES_EXPORT && typeof EventSource !== 'undefined') {
+  const sse = new EventSource('/api/sse');
+  sse.addEventListener('reload', () => location.reload());
+}
 
 </script>
 </body>

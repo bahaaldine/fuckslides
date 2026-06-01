@@ -37,7 +37,9 @@ window.FUCKSLIDES_NAME      = ${nameJson};
 window.FUCKSLIDES_TITLE     = ${titleJson};
 window.FUCKSLIDES_DISABLED  = ${disabledJson};
 </script>`;
-    playerHtml = playerTemplate.replace('</head>', configSnippet + '\n</head>');
+    playerHtml = playerTemplate
+      .replace(/<title>[^<]*<\/title>/, `<title>${config.title || config.name || ''}</title>`)
+      .replace('</head>', configSnippet + '\n</head>');
   }
   buildPlayer();
 

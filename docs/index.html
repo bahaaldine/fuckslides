@@ -460,6 +460,11 @@
       <a href="#cmd-gif" class="nav-item">gif</a>
       <a href="#cmd-create" class="nav-item">create</a>
       <a href="#cmd-import" class="nav-item">import</a>
+      <a href="#cmd-add-slide" class="nav-item">add-slide</a>
+      <a href="#cmd-export" class="nav-item">export</a>
+      <a href="#cmd-pptx" class="nav-item">pptx</a>
+      <a href="#cmd-publish" class="nav-item">publish</a>
+      <a href="#cmd-hub" class="nav-item">hub</a>
     </div>
 
     <div class="nav-section">
@@ -938,6 +943,85 @@
       </div>
 
       <p style="margin-top:16px;"><strong>Requires:</strong> <code>ANTHROPIC_API_KEY</code> environment variable. The SDK (<code>@anthropic-ai/sdk</code>) is included as a dependency — no extra install needed.</p>
+    </section>
+
+    <section class="doc-section" id="cmd-add-slide">
+      <h3>fuckslides add-slide &lt;name&gt;</h3>
+      <p>Adds a new slide to your presentation from a built-in template. The slide is written to your <code>slides/</code> directory and appended to <code>fuckslides.config.js</code> automatically.</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides add-slide my-slide <span class="dim">--template stat</span>
+<span class="dim">→ slides/my-slide.html</span></pre>
+      </div>
+
+      <p>Available templates:</p>
+      <ul style="margin: 10px 0 14px 22px; color: var(--muted); display: flex; flex-direction: column; gap: 5px; font-size: 14px;">
+        <li><code>title</code> — large headline with eyebrow and subtitle (default)</li>
+        <li><code>stat</code> — big number with label and supporting text</li>
+        <li><code>quote</code> — pull quote with attribution</li>
+        <li><code>split</code> — two-column layout</li>
+        <li><code>bullets</code> — heading with bulleted list</li>
+        <li><code>cover</code> — full-bleed cover slide with logo area</li>
+      </ul>
+    </section>
+
+    <section class="doc-section" id="cmd-export">
+      <h3>fuckslides export [output.html]</h3>
+      <p>Bundles your entire presentation into a single self-contained HTML file. All assets — fonts, images, GIFs, JavaScript — are inlined as base64 data URIs. The output file opens in any browser with no server required.</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides export
+<span class="dim">→ my-talk.html  (4.2 MB)</span>
+<span class="dim">  Open in any browser — no server needed.</span></pre>
+      </div>
+
+      <p>You can specify a custom output path:</p>
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides export dist/deck.html</pre>
+      </div>
+
+      <p>This is the command used by CI pipelines (e.g. GitHub Actions) to produce a deployable artifact from a fuckSlides presentation.</p>
+    </section>
+
+    <section class="doc-section" id="cmd-pptx">
+      <h3>fuckslides pptx</h3>
+      <p>Exports all slides to a PowerPoint file (<code>.pptx</code>) by screenshotting each slide at 1280×720 with Puppeteer and embedding the images into a presentation. Useful for sharing with stakeholders who need an editable deck.</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides pptx
+<span class="dim">→ my-talk.pptx</span></pre>
+      </div>
+
+      <p>Like <code>fuckslides pdf</code>, CSS animations are finished and <code>.reveal</code> elements are forced visible before each screenshot is captured.</p>
+    </section>
+
+    <section class="doc-section" id="cmd-publish">
+      <h3>fuckslides publish</h3>
+      <p>Builds a self-contained export and deploys it to GitHub Pages via a <code>gh-pages</code> branch on your <code>origin</code> remote. After the first publish, the presentation is live at your GitHub Pages URL.</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides publish
+<span class="dim">
+  Building export…
+  Pushing to gh-pages…
+
+✅  Published → https://you.github.io/my-talk</span></pre>
+      </div>
+
+      <p><strong>Requires:</strong> a git repository with an <code>origin</code> remote pointing to GitHub. GitHub Pages must be enabled on the repository (Settings → Pages → source: Deploy from a branch → <code>gh-pages</code>).</p>
+    </section>
+
+    <section class="doc-section" id="cmd-hub">
+      <h3>fuckslides hub [path|github-url]</h3>
+      <p>Serves multiple presentations from a single hub interface. Scans one level deep for directories containing a <code>fuckslides.config.js</code> or <code>index.html</code> and lists them all in a browsable index.</p>
+
+      <div class="code-block">
+        <pre><span class="clr">$</span> fuckslides hub              <span class="cm"># serve current directory</span>
+<span class="clr">$</span> fuckslides hub ./decks      <span class="cm"># serve a local path</span>
+<span class="clr">$</span> fuckslides hub https://github.com/you/repo  <span class="cm"># clone &amp; serve a GitHub repo</span></pre>
+      </div>
+
+      <p>When given a GitHub URL, <code>hub</code> clones the repo to a local cache (<code>~/.fuckslides-hub/</code>) and pulls on subsequent runs to stay up to date. This makes it easy to serve a shared team library of presentations without checking anything out manually.</p>
     </section>
 
 

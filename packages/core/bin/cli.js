@@ -40,6 +40,9 @@ switch (cmd) {
   case 'serve':
     require('./serve')(loadConfig(process.cwd()));
     break;
+  case 'hub':
+    require('./hub')(args[0]);
+    break;
   case 'export': {
     const outArg = args[0] && !args[0].startsWith('-') ? args[0] : undefined;
     require('./export')(loadConfig(process.cwd()), outArg ? path.join(process.cwd(), outArg) : undefined);
@@ -65,5 +68,6 @@ switch (cmd) {
     fuckslides export [output.html]   Bundle into a single self-contained HTML file
     fuckslides add-slide <name>       Add a new slide (--template title|stat|quote|split|bullets|cover)
     fuckslides publish                Deploy to GitHub Pages
+    fuckslides hub [path|github-url]  Serve all presentations from a hub manifest
 `);
 }

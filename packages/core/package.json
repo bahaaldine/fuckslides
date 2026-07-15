@@ -1,9 +1,9 @@
 {
-  "name": "fuck-slides",
+  "name": "fslides",
   "version": "0.1.0",
   "description": "A no-bullshit HTML presentation framework",
   "bin": {
-    "fuckslides": "./bin/cli.js"
+    "fslides": "bin/cli.js"
   },
   "main": "index.js",
   "files": [
@@ -21,6 +21,7 @@
     "slides",
     "html"
   ],
+  "author": "bahaaldine",
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": ">=0.30.0",

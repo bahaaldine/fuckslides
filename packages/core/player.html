@@ -1655,10 +1655,29 @@ function fillDeviceSel(sel, devs, key, defLabel, kindLabel) {
   sel.value = Array.from(sel.options).some(o => o.value === saved) ? saved : '';
 }
 
+// Browsers hide device names until getUserMedia has run in this session.
+// On first panel open, briefly touch the devices (stream opened and
+// immediately closed) so the dropdowns can show real names.
+let devUnlockTried = false;
+async function unlockDeviceLabels() {
+  if (devUnlockTried) return;
+  devUnlockTried = true;
+  try {
+    const st = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      .catch(() => navigator.mediaDevices.getUserMedia({ audio: true }));
+    if (st) st.getTracks().forEach(t => t.stop());
+  } catch (_) {}
+}
+
 async function refreshDevices() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
   try {
-    const devs = await navigator.mediaDevices.enumerateDevices();
+    let devs = await navigator.mediaDevices.enumerateDevices();
+    const inputs = devs.filter(d => d.kind === 'audioinput' || d.kind === 'videoinput');
+    if (inputs.length && inputs.every(d => !d.label) && !devUnlockTried) {
+      await unlockDeviceLabels();
+      devs = await navigator.mediaDevices.enumerateDevices();
+    }
     fillDeviceSel(micSel, devs.filter(d => d.kind === 'audioinput'), 'fs-voice-mic', 'Default microphone', 'Microphone');
     fillDeviceSel(camSel, devs.filter(d => d.kind === 'videoinput'), 'fs-voice-cam', 'Default camera', 'Camera');
   } catch (_) {}

@@ -331,6 +331,13 @@
       padding: 8px 12px; cursor: pointer;
     }
     .voice-mode button.active { background: rgba(255,255,255,0.1); color: #fff; }
+    .voice-select {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.7); border-radius: 8px; padding: 7px 8px;
+      font-family: 'Inter', -apple-system, sans-serif; font-size: 0.66rem;
+      max-width: 190px; cursor: pointer;
+    }
+    .voice-select option { background: #16181f; }
 
     /* ── Editor ── */
     #editor-overlay {
@@ -503,6 +510,8 @@
       <button id="mode-audio">🎙 Audio</button>
       <button id="mode-video">🎥 Video</button>
     </div>
+    <select class="voice-select" id="voice-mic-sel" title="Microphone"></select>
+    <select class="voice-select" id="voice-cam-sel" title="Camera"></select>
     <button class="voice-btn" id="voice-rec-btn"><span class="rec-dot"></span><span id="voice-rec-label">Record</span></button>
     <span class="voice-timer" id="voice-timer">0:00</span>
     <audio id="voice-preview" controls preload="none" style="display:none"></audio>
@@ -1628,11 +1637,44 @@ let recStartTs   = 0;
 let recMode      = localStorage.getItem('fs-voice-mode') || 'audio';
 let bubbleLive   = false;   // bubble is showing the live camera preview
 
+const micSel = document.getElementById('voice-mic-sel');
+const camSel = document.getElementById('voice-cam-sel');
+
+function fillDeviceSel(sel, devs, key, defLabel, kindLabel) {
+  const saved = localStorage.getItem(key) || '';
+  sel.innerHTML = '';
+  const d0 = document.createElement('option');
+  d0.value = ''; d0.textContent = defLabel;
+  sel.appendChild(d0);
+  devs.forEach((d, i) => {
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    o.textContent = d.label || (kindLabel + ' ' + (i + 1));
+    sel.appendChild(o);
+  });
+  sel.value = Array.from(sel.options).some(o => o.value === saved) ? saved : '';
+}
+
+async function refreshDevices() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    fillDeviceSel(micSel, devs.filter(d => d.kind === 'audioinput'), 'fs-voice-mic', 'Default microphone', 'Microphone');
+    fillDeviceSel(camSel, devs.filter(d => d.kind === 'videoinput'), 'fs-voice-cam', 'Default camera', 'Camera');
+  } catch (_) {}
+}
+micSel.addEventListener('change', () => localStorage.setItem('fs-voice-mic', micSel.value));
+camSel.addEventListener('change', () => localStorage.setItem('fs-voice-cam', camSel.value));
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
+}
+
 function setMode(m) {
   recMode = m;
   localStorage.setItem('fs-voice-mode', m);
   modeAudioBtn.classList.toggle('active', m === 'audio');
   modeVideoBtn.classList.toggle('active', m === 'video');
+  camSel.style.display = m === 'video' ? '' : 'none';
 }
 modeAudioBtn.addEventListener('click', () => setMode('audio'));
 modeVideoBtn.addEventListener('click', () => setMode('video'));
@@ -1773,6 +1815,7 @@ function isRecording() { return mediaRec && mediaRec.state === 'recording'; }
 function openVoicePanel() {
   if (notesOpen) closeNotes();
   voiceOpen = true;
+  refreshDevices();
   loadVoicePanelForSlide();
   voicePanel.classList.add('open');
   btnRecord.classList.add('active');
@@ -1798,15 +1841,22 @@ function pickMime(video) {
 async function startRecording() {
   if (recordings[slides[idx]] && !confirm('Replace the existing recording for this slide?')) return;
   const wantVideo = recMode === 'video';
+  const micId = micSel.value, camId = camSel.value;
+  const audioC = micId ? { deviceId: { exact: micId } } : true;
+  const videoC = { width: 1280, height: 720, ...(camId ? { deviceId: { exact: camId } } : { facingMode: 'user' }) };
   let stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia(
-      wantVideo ? { audio: true, video: { width: 1280, height: 720, facingMode: 'user' } }
-                : { audio: true });
+    stream = await navigator.mediaDevices.getUserMedia(wantVideo ? { audio: audioC, video: videoC } : { audio: audioC });
   } catch (e) {
-    voiceStatusEl.textContent = wantVideo ? 'camera/mic access denied' : 'microphone access denied';
-    return;
+    // selected device may have been unplugged — fall back to defaults
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(wantVideo ? { audio: true, video: { width: 1280, height: 720, facingMode: 'user' } } : { audio: true });
+    } catch (e2) {
+      voiceStatusEl.textContent = wantVideo ? 'camera/mic access denied' : 'microphone access denied';
+      return;
+    }
   }
+  refreshDevices();   // labels become available once permission is granted
   stopPlayback();
   recChunks = [];
   const mime = pickMime(wantVideo);

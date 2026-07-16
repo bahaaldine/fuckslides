@@ -305,10 +305,22 @@
     #video-bubble:hover { box-shadow: 0 14px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.2); }
     #video-bubble.dragging { cursor: grabbing; transition: none; }
     #video-bubble.rec-preview { border-color: rgba(239,68,68,0.9); }
-    #video-bubble.rec-preview::after {
-      content: ''; position: absolute; top: 12px; right: 26px;
-      width: 10px; height: 10px; border-radius: 50%; background: #EF4444;
+    .bubble-rec {
+      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      display: none; align-items: center; gap: 6px;
+      background: rgba(0,0,0,0.6); border-radius: 20px; padding: 3px 10px;
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.62rem; font-weight: 700;
+      color: #fff; letter-spacing: 0.06em; z-index: 2;
+    }
+    #video-bubble.rec-preview .bubble-rec { display: inline-flex; }
+    .bubble-rec .brc-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #EF4444;
       animation: rec-pulse 1.1s ease-in-out infinite;
+    }
+    #voice-wave {
+      width: 170px; height: 36px; border-radius: 8px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      display: none;
     }
     #video-bubble video {
       width: 100%; height: 100%; object-fit: cover; display: block;
@@ -527,6 +539,7 @@
     <input type="file" id="bg-file" accept="image/*" style="display:none">
     <button class="voice-btn" id="voice-rec-btn"><span class="rec-dot"></span><span id="voice-rec-label">Record</span></button>
     <span class="voice-timer" id="voice-timer">0:00</span>
+    <canvas id="voice-wave" width="340" height="72"></canvas>
     <audio id="voice-preview" controls preload="none" style="display:none"></audio>
     <button class="voice-btn danger" id="voice-del-btn" style="margin-left:auto">Delete recording</button>
   </div>
@@ -535,6 +548,7 @@
 <div id="video-bubble">
   <video id="bubble-video" playsinline></video>
   <div class="bubble-paused-hint">▶</div>
+  <div class="bubble-rec"><span class="brc-dot"></span>REC <span id="bubble-rec-time">0:00</span></div>
 </div>
 
 <nav class="preso-nav" id="preso-nav">
@@ -1983,6 +1997,51 @@ function loadVoicePanelForSlide() {
 
 function isRecording() { return mediaRec && mediaRec.state === 'recording'; }
 
+// ── Live waveform while recording ──
+const voiceWave = document.getElementById('voice-wave');
+let waveAC = null, waveRAF = null;
+function startWave(stream) {
+  try {
+    waveAC = new (window.AudioContext || window.webkitAudioContext)();
+    const src = waveAC.createMediaStreamSource(stream);
+    const an  = waveAC.createAnalyser();
+    an.fftSize = 1024;
+    src.connect(an);
+    const data = new Uint8Array(an.frequencyBinCount);
+    const g = voiceWave.getContext('2d');
+    const W = voiceWave.width, H = voiceWave.height;
+    voiceWave.style.display = 'block';
+    (function draw() {
+      waveRAF = requestAnimationFrame(draw);
+      an.getByteTimeDomainData(data);
+      g.clearRect(0, 0, W, H);
+      // rms → glow intensity
+      let rms = 0;
+      for (let i = 0; i < data.length; i++) { const v = (data[i] - 128) / 128; rms += v * v; }
+      rms = Math.sqrt(rms / data.length);
+      g.strokeStyle = 'rgba(52,211,153,' + Math.min(1, 0.55 + rms * 3) + ')';
+      g.lineWidth = 2;
+      g.shadowColor = '#34D399';
+      g.shadowBlur = Math.min(14, rms * 90);
+      g.beginPath();
+      const step = data.length / W;
+      for (let x = 0; x < W; x++) {
+        const v = data[Math.floor(x * step)] / 255;
+        const y = v * H;
+        x === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+      }
+      g.stroke();
+      g.shadowBlur = 0;
+    })();
+  } catch (_) {}
+}
+function stopWave() {
+  if (waveRAF) cancelAnimationFrame(waveRAF);
+  if (waveAC) { try { waveAC.close(); } catch (_) {} }
+  waveAC = null; waveRAF = null;
+  voiceWave.style.display = 'none';
+}
+
 function openVoicePanel() {
   if (notesOpen) closeNotes();
   voiceOpen = true;
@@ -2012,6 +2071,9 @@ function pickMime(video) {
 async function startRecording() {
   if (recordings[slides[idx]] && !confirm('Replace the existing recording for this slide?')) return;
   const wantVideo = recMode === 'video';
+  voiceRecBtn.disabled = true;
+  voiceRecLabel.textContent = 'Starting…';
+  voiceStatusEl.textContent = wantVideo ? 'starting camera…' : 'starting microphone…';
   const micId = micSel.value, camId = camSel.value;
   const audioC = micId ? { deviceId: { exact: micId } } : true;
   const videoC = { width: 1280, height: 720, ...(camId ? { deviceId: { exact: camId } } : { facingMode: 'user' }) };
@@ -2024,6 +2086,8 @@ async function startRecording() {
       stream = await navigator.mediaDevices.getUserMedia(wantVideo ? { audio: true, video: { width: 1280, height: 720, facingMode: 'user' } } : { audio: true });
     } catch (e2) {
       voiceStatusEl.textContent = wantVideo ? 'camera/mic access denied' : 'microphone access denied';
+      voiceRecBtn.disabled = false;
+      voiceRecLabel.textContent = 'Record';
       return;
     }
   }
@@ -2063,24 +2127,32 @@ async function startRecording() {
     bubbleVideo.play().catch(() => {});
   }
 
-  mediaRec.start();
-  recStartTs = Date.now();
-  voiceRecBtn.classList.add('recording');
-  btnRecord.classList.add('rec-live');
-  voiceRecLabel.textContent = 'Stop';
-  voiceStatusEl.textContent = wantVideo ? 'recording camera + mic…' : 'recording…';
+  mediaRec.onstart = () => {
+    recStartTs = Date.now();
+    voiceRecBtn.disabled = false;
+    voiceRecBtn.classList.add('recording');
+    btnRecord.classList.add('rec-live');
+    voiceRecLabel.textContent = 'Stop';
+    voiceStatusEl.textContent = wantVideo ? '● recording camera + mic' : '● recording';
+    voiceTimerEl.textContent = '0:00';
+    startWave(stream);
+    recTimerInt = setInterval(() => {
+      const t = fmtTime((Date.now() - recStartTs) / 1000);
+      voiceTimerEl.textContent = t;
+      const bt = document.getElementById('bubble-rec-time');
+      if (bt) bt.textContent = t;
+    }, 250);
+  };
   voicePreview.style.display = 'none';
   voiceDelBtn.style.display = 'none';
-  voiceTimerEl.textContent = '0:00';
-  recTimerInt = setInterval(() => {
-    voiceTimerEl.textContent = fmtTime((Date.now() - recStartTs) / 1000);
-  }, 250);
+  mediaRec.start();
 }
 
 function stopRecording() {
   if (!isRecording()) return;
   mediaRec.stop();
   clearInterval(recTimerInt);
+  stopWave();
   voiceRecBtn.classList.remove('recording');
   btnRecord.classList.remove('rec-live');
   voiceRecLabel.textContent = 'Record';

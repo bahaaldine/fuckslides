@@ -243,7 +243,7 @@
 
     /* ── Voice-over ── */
     #voice-panel {
-      position: fixed; bottom: 0; left: 0; right: 0; height: 175px;
+      position: fixed; bottom: 0; left: 0; right: 0; height: 300px;
       background: rgba(10,12,18,0.98); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
       border-top: 1px solid rgba(255,255,255,0.10); z-index: 8880;
       transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.2,0,0.2,1);
@@ -258,8 +258,19 @@
     }
     .voice-slide-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.62rem; color: rgba(255,255,255,0.2); text-transform: none; letter-spacing: 0; font-weight: 400; }
     .voice-status { margin-left: auto; font-size: 0.58rem; color: rgba(255,255,255,0.35); text-transform: none; letter-spacing: 0.02em; font-weight: 500; }
+    /* Teleprompter: the slide's speaker notes, readable while recording */
+    .voice-notes {
+      flex: 1; min-height: 0; overflow-y: auto;
+      padding: 12px 1.3rem;
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 0.95rem; line-height: 1.75;
+      color: rgba(255,255,255,0.78);
+      white-space: pre-wrap;
+      scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent;
+    }
+    .voice-notes.empty { color: rgba(255,255,255,0.22); font-style: italic; }
     /* bottom padding keeps controls clear of the floating nav pill (bottom-right) */
-    .voice-body { flex: 1; display: flex; align-items: center; gap: 14px; padding: 0 1.1rem 72px; }
+    .voice-body { flex-shrink: 0; display: flex; align-items: center; gap: 14px; padding: 10px 1.1rem 72px; border-top: 1px solid rgba(255,255,255,0.07); }
     .voice-btn {
       display: inline-flex; align-items: center; gap: 7px;
       background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
@@ -445,6 +456,7 @@
     <span class="voice-slide-name" id="voice-slide-name"></span>
     <span class="voice-status" id="voice-status"></span>
   </div>
+  <div class="voice-notes" id="voice-notes"></div>
   <div class="voice-body">
     <button class="voice-btn" id="voice-rec-btn"><span class="rec-dot"></span><span id="voice-rec-label">Record</span></button>
     <span class="voice-timer" id="voice-timer">0:00</span>
@@ -1621,6 +1633,11 @@ function fmtTime(s) { return Math.floor(s / 60) + ':' + String(Math.floor(s % 60
 
 function loadVoicePanelForSlide() {
   voiceSlideEl.textContent = slides[idx];
+  const note = (allNotes[slides[idx]] || '').trim();
+  const voiceNotesEl = document.getElementById('voice-notes');
+  voiceNotesEl.textContent = note || 'No speaker notes for this slide — press N to write some, they\'ll show here as your talk track.';
+  voiceNotesEl.classList.toggle('empty', !note);
+  voiceNotesEl.scrollTop = 0;
   const url = recordingUrl(slides[idx]);
   if (url && !isRecording()) {
     voicePreview.src = url;

@@ -241,6 +241,44 @@
     }
     #notes-textarea::placeholder { color: rgba(255,255,255,0.18); }
 
+    /* ── Voice-over ── */
+    #voice-panel {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 120px;
+      background: rgba(10,12,18,0.98); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255,255,255,0.10); z-index: 8880;
+      transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.2,0,0.2,1);
+      display: flex; flex-direction: column;
+    }
+    #voice-panel.open { transform: translateY(0); }
+    .voice-header {
+      flex-shrink: 0; display: flex; align-items: center; gap: 0.8rem;
+      padding: 0.45rem 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.07);
+      font-family: 'Inter', -apple-system, sans-serif; font-size: 0.58rem; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.35);
+    }
+    .voice-slide-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.62rem; color: rgba(255,255,255,0.2); text-transform: none; letter-spacing: 0; font-weight: 400; }
+    .voice-status { margin-left: auto; font-size: 0.58rem; color: rgba(255,255,255,0.35); text-transform: none; letter-spacing: 0.02em; font-weight: 500; }
+    .voice-body { flex: 1; display: flex; align-items: center; gap: 14px; padding: 0 1.1rem; }
+    .voice-btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.8); border-radius: 8px; padding: 8px 16px;
+      font-family: 'Inter', -apple-system, sans-serif; font-size: 0.72rem; font-weight: 600;
+      cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    }
+    .voice-btn:hover { background: rgba(255,255,255,0.12); }
+    .voice-btn:disabled { opacity: 0.3; cursor: default; }
+    .voice-btn.recording { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.5); color: #F87171; }
+    .voice-btn.danger:hover { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #F87171; }
+    .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #EF4444; flex-shrink: 0; }
+    .voice-btn.recording .rec-dot { animation: rec-pulse 1.1s ease-in-out infinite; }
+    @keyframes rec-pulse { 50% { opacity: 0.25; } }
+    .voice-timer { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.82rem; color: rgba(255,255,255,0.6); min-width: 46px; }
+    #voice-preview { height: 30px; flex: 1; max-width: 380px; filter: invert(0.88) hue-rotate(180deg); }
+    #voice-preview::-webkit-media-controls-enclosure { border-radius: 8px; }
+    .nav-btn.playing { background: rgba(52,211,153,0.15); color: #34D399; }
+    .nav-btn.rec-live { background: rgba(239,68,68,0.18); color: #F87171; }
+
     /* ── Editor ── */
     #editor-overlay {
       position: fixed; inset: 0; z-index: 9500;
@@ -400,6 +438,20 @@
   <textarea id="notes-textarea" placeholder="Add speaker notes for this slide…" spellcheck="true"></textarea>
 </div>
 
+<div id="voice-panel">
+  <div class="voice-header">
+    <span>Voice-over</span>
+    <span class="voice-slide-name" id="voice-slide-name"></span>
+    <span class="voice-status" id="voice-status"></span>
+  </div>
+  <div class="voice-body">
+    <button class="voice-btn" id="voice-rec-btn"><span class="rec-dot"></span><span id="voice-rec-label">Record</span></button>
+    <span class="voice-timer" id="voice-timer">0:00</span>
+    <audio id="voice-preview" controls preload="none" style="display:none"></audio>
+    <button class="voice-btn danger" id="voice-del-btn" style="margin-left:auto">Delete recording</button>
+  </div>
+</div>
+
 <nav class="preso-nav" id="preso-nav">
   <img class="nav-logo" src="/logo.png" alt="">
   <span class="nav-title" id="nav-title"></span>
@@ -424,6 +476,13 @@
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l4 5-4 5"/></svg>
   </button>
   <div class="nav-sep"></div>
+  <button class="nav-btn" id="btn-voice" title="Play voice-over (V)" style="display:none">
+    <svg id="voice-icon-play" viewBox="0 0 16 16" fill="currentColor"><path d="M4 3.5v9l8-4.5-8-4.5z"/></svg>
+    <svg id="voice-icon-pause" viewBox="0 0 16 16" fill="currentColor" style="display:none"><rect x="3.5" y="3" width="3.2" height="10" rx="0.8"/><rect x="9.3" y="3" width="3.2" height="10" rx="0.8"/></svg>
+  </button>
+  <button class="nav-btn" id="btn-record" title="Record voice-over" style="display:none">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="1.5" width="4" height="8" rx="2"/><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5"/></svg>
+  </button>
   <button class="nav-btn" id="btn-notes" title="Speaker notes (N)">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="10" rx="1.5"/><path d="M5 6h6M5 8.5h4"/></svg>
   </button>
@@ -607,6 +666,7 @@ function go(newIdx) {
     if (thumbsBuilt) updateThumbHighlight();
     if (fsBuilt) updateFilmstripHighlight();
     if (notesOpen) loadNotesForSlide();
+    voiceOnSlideChange();
     broadcastPresenterState();
   };
 
@@ -994,6 +1054,7 @@ function handleKey(key) {
   if (key === 'g' || key === 'G') { toggleOverview(); return; }
   if (key === 't' || key === 'T') { toggleFilmstrip(); return; }
   if (key === 'n' || key === 'N') { toggleNotes(); return; }
+  if (key === 'v' || key === 'V') { voiceToggle(); return; }
   if (key === 'p' || key === 'P') { openPresenterView(); return; }
   if (key === 'l' || key === 'L') { toggleLaser(); return; }
   if (key === 'd' || key === 'D') { if (!ovOpen) { toggleDraw(); return; } }
@@ -1003,6 +1064,7 @@ function handleKey(key) {
   if (key === 'Escape') {
     if (laserMode) { deactivateLaser(); return; }
     if (drawMode)  { deactivateDraw();  return; }
+    if (voiceOpen) { closeVoicePanel(); return; }
     if (ovOpen) { closeOverview(); return; } if (fsOpen) { closeFilmstrip(); return; }
   }
   if (ovOpen) {
@@ -1468,6 +1530,214 @@ notesTextarea.addEventListener('keydown', e => {
   if (e.key === 'Escape') { e.preventDefault(); closeNotes(); }
 });
 btnNotes.addEventListener('click', toggleNotes);
+
+// ── Voice-over ────────────────────────────────────────────────────────────────
+// Recording (serve mode only): mic button opens a panel with record/stop,
+// preview, and delete. One recording per slide, stored as recordings/<slide>.<ext>;
+// re-recording overwrites. Playback (everywhere): ▶ in the nav when the current
+// slide has audio; once the viewer starts playback, advancing to the next slide
+// auto-plays its recording too (tour mode) until they pause.
+const btnVoice      = document.getElementById('btn-voice');
+const btnRecord     = document.getElementById('btn-record');
+const voicePanel    = document.getElementById('voice-panel');
+const voiceRecBtn   = document.getElementById('voice-rec-btn');
+const voiceRecLabel = document.getElementById('voice-rec-label');
+const voiceTimerEl  = document.getElementById('voice-timer');
+const voicePreview  = document.getElementById('voice-preview');
+const voiceDelBtn   = document.getElementById('voice-del-btn');
+const voiceSlideEl  = document.getElementById('voice-slide-name');
+const voiceStatusEl = document.getElementById('voice-status');
+const voiceIconPlay  = document.getElementById('voice-icon-play');
+const voiceIconPause = document.getElementById('voice-icon-pause');
+
+let recordings   = window.FUCKSLIDES_RECORDINGS || {};
+let voiceOpen    = false;
+let voiceTour    = false;   // auto-continue across slides once playback starts
+let recVersion   = 0;       // cache-buster after re-record
+let mediaRec     = null;
+let recChunks    = [];
+let recTimerInt  = null;
+let recStartTs   = 0;
+const voiceAudio = new Audio();
+
+const canRecord = !window.FUCKSLIDES_EXPORT;
+if (canRecord) {
+  fetch('/api/recordings').then(r => r.json()).then(d => { recordings = d; updateVoiceUI(); }).catch(() => {});
+  btnRecord.style.display = '';
+}
+
+function recordingUrl(file) {
+  return recordings[file] ? recordings[file] + '?v=' + recVersion : null;
+}
+
+function updateVoiceUI() {
+  const has = !!recordings[slides[idx]];
+  btnVoice.style.display = has ? '' : 'none';
+  const playing = has && !voiceAudio.paused && !voiceAudio.ended;
+  voiceIconPlay.style.display  = playing ? 'none' : '';
+  voiceIconPause.style.display = playing ? '' : 'none';
+  btnVoice.classList.toggle('playing', playing);
+  if (voiceOpen) loadVoicePanelForSlide();
+}
+
+function voiceToggle() {
+  if (!recordings[slides[idx]]) return;
+  if (!voiceAudio.paused && !voiceAudio.ended) {
+    voiceAudio.pause();
+    voiceTour = false;
+  } else {
+    voiceTour = true;
+    playVoiceForSlide();
+  }
+  updateVoiceUI();
+}
+
+function playVoiceForSlide() {
+  const url = recordingUrl(slides[idx]);
+  if (!url) return;
+  voiceAudio.src = url;
+  voiceAudio.play().catch(() => {});
+}
+
+voiceAudio.addEventListener('play',  updateVoiceUI);
+voiceAudio.addEventListener('pause', updateVoiceUI);
+voiceAudio.addEventListener('ended', updateVoiceUI);
+
+function voiceOnSlideChange() {
+  voiceAudio.pause();
+  voiceAudio.removeAttribute('src');
+  if (voiceTour && recordings[slides[idx]]) playVoiceForSlide();
+  updateVoiceUI();
+}
+
+btnVoice.addEventListener('click', voiceToggle);
+
+// ── Recorder panel (serve mode) ──
+function fmtTime(s) { return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'); }
+
+function loadVoicePanelForSlide() {
+  voiceSlideEl.textContent = slides[idx];
+  const url = recordingUrl(slides[idx]);
+  if (url && !isRecording()) {
+    voicePreview.src = url;
+    voicePreview.style.display = '';
+    voiceDelBtn.style.display = '';
+    voiceStatusEl.textContent = 'recording saved';
+  } else {
+    voicePreview.removeAttribute('src');
+    voicePreview.style.display = 'none';
+    voiceDelBtn.style.display = 'none';
+    if (!isRecording()) voiceStatusEl.textContent = 'no recording for this slide';
+  }
+}
+
+function isRecording() { return mediaRec && mediaRec.state === 'recording'; }
+
+function openVoicePanel() {
+  if (notesOpen) closeNotes();
+  voiceOpen = true;
+  loadVoicePanelForSlide();
+  voicePanel.classList.add('open');
+  btnRecord.classList.add('active');
+}
+function closeVoicePanel() {
+  if (isRecording()) stopRecording();
+  voiceOpen = false;
+  voicePanel.classList.remove('open');
+  btnRecord.classList.remove('active');
+}
+btnRecord.addEventListener('click', () => { voiceOpen ? closeVoicePanel() : openVoicePanel(); });
+
+function pickMime() {
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+  for (const c of candidates) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
+  }
+  return '';
+}
+
+async function startRecording() {
+  if (recordings[slides[idx]] && !confirm('Replace the existing recording for this slide?')) return;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    voiceStatusEl.textContent = 'microphone access denied';
+    return;
+  }
+  voiceAudio.pause();
+  recChunks = [];
+  const mime = pickMime();
+  mediaRec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  mediaRec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+  mediaRec.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    uploadRecording(new Blob(recChunks, { type: mediaRec.mimeType }));
+  };
+  mediaRec.start();
+  recStartTs = Date.now();
+  voiceRecBtn.classList.add('recording');
+  btnRecord.classList.add('rec-live');
+  voiceRecLabel.textContent = 'Stop';
+  voiceStatusEl.textContent = 'recording…';
+  voicePreview.style.display = 'none';
+  voiceDelBtn.style.display = 'none';
+  voiceTimerEl.textContent = '0:00';
+  recTimerInt = setInterval(() => {
+    voiceTimerEl.textContent = fmtTime((Date.now() - recStartTs) / 1000);
+  }, 250);
+}
+
+function stopRecording() {
+  if (!isRecording()) return;
+  mediaRec.stop();
+  clearInterval(recTimerInt);
+  voiceRecBtn.classList.remove('recording');
+  btnRecord.classList.remove('rec-live');
+  voiceRecLabel.textContent = 'Record';
+  voiceStatusEl.textContent = 'saving…';
+}
+
+function uploadRecording(blob) {
+  const file = slides[idx];
+  const ext  = blob.type.includes('mp4') ? 'm4a' : 'webm';
+  fetch('/api/save-recording?file=' + encodeURIComponent(file) + '&ext=' + ext, {
+    method: 'POST',
+    headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+    body: blob,
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.ok) { voiceStatusEl.textContent = 'save failed: ' + (d.error || 'unknown'); return; }
+    recordings[file] = d.url;
+    recVersion++;
+    voiceStatusEl.textContent = '✓ saved';
+    loadVoicePanelForSlide();
+    updateVoiceUI();
+  })
+  .catch(e => { voiceStatusEl.textContent = 'save failed: ' + e.message; });
+}
+
+voiceRecBtn.addEventListener('click', () => { isRecording() ? stopRecording() : startRecording(); });
+
+voiceDelBtn.addEventListener('click', () => {
+  const file = slides[idx];
+  if (!recordings[file] || !confirm('Delete the recording for ' + file + '?')) return;
+  fetch('/api/delete-recording', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file }),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.ok) { voiceStatusEl.textContent = 'delete failed'; return; }
+    delete recordings[file];
+    voiceStatusEl.textContent = 'recording deleted';
+    loadVoicePanelForSlide();
+    updateVoiceUI();
+  })
+  .catch(() => { voiceStatusEl.textContent = 'delete failed'; });
+});
 
 // ── 16:9 letterbox — fixed 1280×720, scaled to fit ───────────────────────────
 function sizeFrame() {

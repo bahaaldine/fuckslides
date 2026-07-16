@@ -10,7 +10,10 @@ const MIME = {
   '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
   '.gif': 'image/gif', '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2', '.woff': 'font/woff',
+  '.webm': 'audio/webm', '.m4a': 'audio/mp4', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav',
 };
+
+const AUDIO_EXTS = ['.webm', '.m4a', '.mp3', '.ogg', '.wav'];
 
 module.exports = function serve(config) {
   const cwd       = process.cwd();
@@ -45,6 +48,35 @@ window.FUCKSLIDES_DISABLED  = ${disabledJson};
 
   const cfgPath   = path.join(cwd, 'fuckslides.config.js');
   const notesPath = path.join(cwd, 'notes.json');
+  const recDir    = path.join(slidesDir, 'recordings');
+
+  // Map of slide file -> relative recording URL. One recording per slide;
+  // if multiple extensions exist for the same base, the newest mtime wins.
+  function scanRecordings() {
+    const map = {};
+    if (!fs.existsSync(recDir)) return map;
+    const best = {};
+    for (const f of fs.readdirSync(recDir)) {
+      const ext = path.extname(f).toLowerCase();
+      if (!AUDIO_EXTS.includes(ext)) continue;
+      const base = path.basename(f, ext);
+      const mtime = fs.statSync(path.join(recDir, f)).mtimeMs;
+      if (!best[base] || mtime > best[base].mtime) best[base] = { file: f, mtime };
+    }
+    for (const base of Object.keys(best)) map[base + '.html'] = 'recordings/' + best[base].file;
+    return map;
+  }
+
+  function removeRecordings(slideFile) {
+    if (!fs.existsSync(recDir)) return;
+    const base = path.basename(slideFile, '.html');
+    for (const f of fs.readdirSync(recDir)) {
+      const ext = path.extname(f).toLowerCase();
+      if (AUDIO_EXTS.includes(ext) && path.basename(f, ext) === base) {
+        fs.unlinkSync(path.join(recDir, f));
+      }
+    }
+  }
 
   const server = http.createServer((req, res) => {
     let urlPath = req.url.split('?')[0];
@@ -143,6 +175,55 @@ window.FUCKSLIDES_DISABLED  = ${disabledJson};
           if (notes.trim() === '') delete all[file];
           else all[file] = notes;
           fs.writeFileSync(notesPath, JSON.stringify(all, null, 2), 'utf8');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (req.method === 'GET' && urlPath === '/api/recordings') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(scanRecordings()));
+      return;
+    }
+
+    if (req.method === 'POST' && urlPath === '/api/save-recording') {
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const file = params.get('file');
+      const ext  = (params.get('ext') || 'webm').replace(/[^a-z0-9]/gi, '');
+      if (!file || !AUDIO_EXTS.includes('.' + ext)) {
+        res.writeHead(400); res.end('Bad file or ext'); return;
+      }
+      const chunks = [];
+      req.on('data', c => chunks.push(c));
+      req.on('end', () => {
+        try {
+          if (!fs.existsSync(recDir)) fs.mkdirSync(recDir, { recursive: true });
+          removeRecordings(path.basename(file));          // overwrite semantics
+          const base   = path.basename(file, '.html');
+          const target = path.join(recDir, base + '.' + ext);
+          fs.writeFileSync(target, Buffer.concat(chunks));
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, url: 'recordings/' + base + '.' + ext }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && urlPath === '/api/delete-recording') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const { file } = JSON.parse(body);
+          removeRecordings(path.basename(file));
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true }));
         } catch (e) {

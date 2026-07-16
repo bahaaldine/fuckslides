@@ -453,7 +453,7 @@
 </div>
 
 <nav class="preso-nav" id="preso-nav">
-  <img class="nav-logo" src="/logo.png" alt="">
+  <img class="nav-logo" src="/logo.png" alt="" onerror="this.style.display='none'">
   <span class="nav-title" id="nav-title"></span>
   <div class="nav-sep"></div>
   <span class="nav-timer" id="nav-timer" title="C start/pause · R reset">00:00</span>
@@ -1560,10 +1560,13 @@ let recTimerInt  = null;
 let recStartTs   = 0;
 const voiceAudio = new Audio();
 
-const canRecord = !window.FUCKSLIDES_EXPORT;
-if (canRecord) {
-  fetch('/api/recordings').then(r => r.json()).then(d => { recordings = d; updateVoiceUI(); }).catch(() => {});
-  btnRecord.style.display = '';
+// Mic only appears when the serve API is actually reachable — never for
+// viewers of an exported/deployed player.
+if (!window.FUCKSLIDES_EXPORT) {
+  fetch('/api/recordings')
+    .then(r => { if (!r.ok) throw new Error('no api'); return r.json(); })
+    .then(d => { recordings = d; btnRecord.style.display = ''; updateVoiceUI(); })
+    .catch(() => {});
 }
 
 function recordingUrl(file) {

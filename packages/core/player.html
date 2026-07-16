@@ -338,6 +338,13 @@
       max-width: 190px; cursor: pointer;
     }
     .voice-select option { background: #16181f; }
+    .voice-bg { display: inline-flex; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; overflow: hidden; }
+    .voice-bg button {
+      background: transparent; border: none; color: rgba(255,255,255,0.45);
+      font-family: 'Inter', -apple-system, sans-serif; font-size: 0.66rem; font-weight: 600;
+      padding: 8px 10px; cursor: pointer; white-space: nowrap;
+    }
+    .voice-bg button.active { background: rgba(255,255,255,0.1); color: #fff; }
 
     /* ── Editor ── */
     #editor-overlay {
@@ -512,6 +519,12 @@
     </div>
     <select class="voice-select" id="voice-mic-sel" title="Microphone"></select>
     <select class="voice-select" id="voice-cam-sel" title="Camera"></select>
+    <div class="voice-bg" id="voice-bg" title="Virtual background">
+      <button id="bg-none">No BG</button>
+      <button id="bg-blur">Blur</button>
+      <button id="bg-image">Image…</button>
+    </div>
+    <input type="file" id="bg-file" accept="image/*" style="display:none">
     <button class="voice-btn" id="voice-rec-btn"><span class="rec-dot"></span><span id="voice-rec-label">Record</span></button>
     <span class="voice-timer" id="voice-timer">0:00</span>
     <audio id="voice-preview" controls preload="none" style="display:none"></audio>
@@ -1688,12 +1701,151 @@ if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
   navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
 }
 
+// ── Virtual background (blur / custom image) ──
+// MediaPipe selfie segmentation masks the person each frame; the frame is
+// composited over a blurred feed or an uploaded image on a canvas, and the
+// canvas stream is what gets recorded — the effect is baked in.
+const bgNoneBtn  = document.getElementById('bg-none');
+const bgBlurBtn  = document.getElementById('bg-blur');
+const bgImageBtn = document.getElementById('bg-image');
+const bgFileInp  = document.getElementById('bg-file');
+const bgWrap     = document.getElementById('voice-bg');
+let bgMode  = localStorage.getItem('fs-voice-bg') || 'none';
+let bgImage = null;
+let segmenter = null, segLoading = null;
+
+(function restoreBgImage() {
+  const d = localStorage.getItem('fs-voice-bg-img');
+  if (d) { bgImage = new Image(); bgImage.src = d; }
+})();
+
+function setBg(m) {
+  if (m === 'image' && !bgImage) { bgFileInp.click(); return; }
+  bgMode = m;
+  localStorage.setItem('fs-voice-bg', m);
+  bgNoneBtn.classList.toggle('active', m === 'none');
+  bgBlurBtn.classList.toggle('active', m === 'blur');
+  bgImageBtn.classList.toggle('active', m === 'image');
+}
+bgNoneBtn.addEventListener('click', () => setBg('none'));
+bgBlurBtn.addEventListener('click', () => setBg('blur'));
+bgImageBtn.addEventListener('click', () => { if (bgMode === 'image' || !bgImage) bgFileInp.click(); else setBg('image'); });
+if (bgMode === 'image' && !bgImage) bgMode = 'none';
+setBg(bgMode);
+bgFileInp.addEventListener('change', () => {
+  const f = bgFileInp.files[0];
+  if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    // downscale to 1280x720 cover so it fits localStorage
+    const c = document.createElement('canvas'); c.width = 1280; c.height = 720;
+    const g = c.getContext('2d');
+    const scale = Math.max(1280 / img.width, 720 / img.height);
+    const w = img.width * scale, h = img.height * scale;
+    g.drawImage(img, (1280 - w) / 2, (720 - h) / 2, w, h);
+    const data = c.toDataURL('image/jpeg', 0.82);
+    try { localStorage.setItem('fs-voice-bg-img', data); } catch (_) {}
+    bgImage = new Image(); bgImage.src = data;
+    setBg('image');
+  };
+  img.src = URL.createObjectURL(f);
+});
+
+function loadSegmenter() {
+  if (segmenter) return Promise.resolve(segmenter);
+  if (segLoading) return segLoading;
+  segLoading = import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14')
+    .then(async vision => {
+      const fileset = await vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+      segmenter = await vision.ImageSegmenter.createFromOptions(fileset, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite',
+          delegate: 'GPU',
+        },
+        runningMode: 'VIDEO',
+        outputCategoryMask: false,
+        outputConfidenceMasks: true,
+      });
+      return segmenter;
+    })
+    .catch(e => { segLoading = null; throw e; });
+  return segLoading;
+}
+
+// Builds a processed MediaStream from a raw camera stream, or null if the
+// effect can't run (offline / model failed) — caller falls back to raw.
+let vbStop = null;
+async function buildVirtualBgStream(rawStream) {
+  try { await loadSegmenter(); } catch (_) { return null; }
+
+  const srcVideo = document.createElement('video');
+  srcVideo.srcObject = rawStream; srcVideo.muted = true; srcVideo.playsInline = true;
+  await srcVideo.play();
+  const W = srcVideo.videoWidth || 1280, H = srcVideo.videoHeight || 720;
+
+  const out = document.createElement('canvas');   out.width = W;  out.height = H;
+  const octx = out.getContext('2d');
+  const person = document.createElement('canvas'); person.width = W; person.height = H;
+  const pctx = person.getContext('2d');
+  const maskC = document.createElement('canvas');  maskC.width = W; maskC.height = H;
+  const mctx = maskC.getContext('2d');
+  let maskData = null;
+  let running = true;
+
+  function drawFrame() {
+    if (!running) return;
+    try {
+      segmenter.segmentForVideo(srcVideo, performance.now(), result => {
+        const mask = result.confidenceMasks && result.confidenceMasks[0];
+        if (mask) {
+          const arr = mask.getAsFloat32Array();
+          const mw = mask.width, mh = mask.height;
+          if (!maskData || maskData.width !== mw) maskData = new ImageData(mw, mh);
+          const px = maskData.data;
+          for (let i = 0; i < arr.length; i++) px[i * 4 + 3] = arr[i] * 255;
+          mctx.putImageData(maskData, 0, 0);
+          mask.close();
+        }
+      });
+    } catch (_) {}
+
+    // background layer
+    if (bgMode === 'image' && bgImage && bgImage.complete) {
+      octx.filter = 'none';
+      octx.drawImage(bgImage, 0, 0, W, H);
+    } else {
+      octx.filter = 'blur(16px)';
+      octx.drawImage(srcVideo, 0, 0, W, H);
+      octx.filter = 'none';
+    }
+    // person layer: frame masked by segmentation, edges softened
+    pctx.clearRect(0, 0, W, H);
+    pctx.filter = 'blur(3px)';
+    pctx.drawImage(maskC, 0, 0, W, H);
+    pctx.filter = 'none';
+    pctx.globalCompositeOperation = 'source-in';
+    pctx.drawImage(srcVideo, 0, 0, W, H);
+    pctx.globalCompositeOperation = 'source-over';
+    octx.drawImage(person, 0, 0);
+
+    if (srcVideo.requestVideoFrameCallback) srcVideo.requestVideoFrameCallback(drawFrame);
+    else requestAnimationFrame(drawFrame);
+  }
+  drawFrame();
+
+  const outStream = out.captureStream(30);
+  rawStream.getAudioTracks().forEach(t => outStream.addTrack(t));
+  vbStop = () => { running = false; srcVideo.srcObject = null; };
+  return outStream;
+}
+
 function setMode(m) {
   recMode = m;
   localStorage.setItem('fs-voice-mode', m);
   modeAudioBtn.classList.toggle('active', m === 'audio');
   modeVideoBtn.classList.toggle('active', m === 'video');
   camSel.style.display = m === 'video' ? '' : 'none';
+  bgWrap.style.display = m === 'video' ? '' : 'none';
 }
 modeAudioBtn.addEventListener('click', () => setMode('audio'));
 modeVideoBtn.addEventListener('click', () => setMode('video'));
@@ -1877,12 +2029,22 @@ async function startRecording() {
   }
   refreshDevices();   // labels become available once permission is granted
   stopPlayback();
+
+  // virtual background: record the composited canvas stream instead
+  let recStream = stream;
+  if (wantVideo && bgMode !== 'none') {
+    voiceStatusEl.textContent = 'loading background effect…';
+    const processed = await buildVirtualBgStream(stream);
+    if (processed) recStream = processed;
+  }
+
   recChunks = [];
   const mime = pickMime(wantVideo);
-  mediaRec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  mediaRec = new MediaRecorder(recStream, mime ? { mimeType: mime } : undefined);
   mediaRec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
   mediaRec.onstop = () => {
     stream.getTracks().forEach(t => t.stop());
+    if (vbStop) { vbStop(); vbStop = null; }
     bubbleLive = false;
     bubbleVideo.srcObject = null;
     bubble.classList.remove('mirrored', 'rec-preview');
@@ -1893,7 +2055,7 @@ async function startRecording() {
   // live self-view while recording video
   if (wantVideo) {
     bubbleLive = true;
-    bubbleVideo.srcObject = stream;
+    bubbleVideo.srcObject = recStream;
     bubbleVideo.muted = true;
     bubble.classList.add('mirrored', 'rec-preview');
     bubble.classList.remove('paused');

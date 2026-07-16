@@ -291,6 +291,47 @@
     .nav-btn.playing { background: rgba(52,211,153,0.15); color: #34D399; }
     .nav-btn.rec-live { background: rgba(239,68,68,0.18); color: #F87171; }
 
+    /* ── Video narration bubble ── */
+    #video-bubble {
+      position: fixed; left: 1.5rem; bottom: 1.5rem;
+      width: 200px; height: 200px; border-radius: 50%;
+      overflow: hidden; z-index: 9990; display: none;
+      border: 3px solid rgba(255,255,255,0.85);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,0,0,0.2);
+      cursor: grab; user-select: none;
+      background: #000;
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    #video-bubble:hover { box-shadow: 0 14px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.2); }
+    #video-bubble.dragging { cursor: grabbing; transition: none; }
+    #video-bubble.rec-preview { border-color: rgba(239,68,68,0.9); }
+    #video-bubble.rec-preview::after {
+      content: ''; position: absolute; top: 12px; right: 26px;
+      width: 10px; height: 10px; border-radius: 50%; background: #EF4444;
+      animation: rec-pulse 1.1s ease-in-out infinite;
+    }
+    #video-bubble video {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      pointer-events: none;
+    }
+    #video-bubble.mirrored video { transform: scaleX(-1); }
+    #video-bubble .bubble-paused-hint {
+      position: absolute; inset: 0; display: none;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.35); color: #fff; font-size: 2.2rem;
+      pointer-events: none;
+    }
+    #video-bubble.paused .bubble-paused-hint { display: flex; }
+
+    /* ── Audio / Video mode toggle ── */
+    .voice-mode { display: inline-flex; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; overflow: hidden; }
+    .voice-mode button {
+      background: transparent; border: none; color: rgba(255,255,255,0.45);
+      font-family: 'Inter', -apple-system, sans-serif; font-size: 0.68rem; font-weight: 600;
+      padding: 8px 12px; cursor: pointer;
+    }
+    .voice-mode button.active { background: rgba(255,255,255,0.1); color: #fff; }
+
     /* ── Editor ── */
     #editor-overlay {
       position: fixed; inset: 0; z-index: 9500;
@@ -458,11 +499,20 @@
   </div>
   <div class="voice-notes" id="voice-notes"></div>
   <div class="voice-body">
+    <div class="voice-mode" id="voice-mode">
+      <button id="mode-audio">🎙 Audio</button>
+      <button id="mode-video">🎥 Video</button>
+    </div>
     <button class="voice-btn" id="voice-rec-btn"><span class="rec-dot"></span><span id="voice-rec-label">Record</span></button>
     <span class="voice-timer" id="voice-timer">0:00</span>
     <audio id="voice-preview" controls preload="none" style="display:none"></audio>
     <button class="voice-btn danger" id="voice-del-btn" style="margin-left:auto">Delete recording</button>
   </div>
+</div>
+
+<div id="video-bubble">
+  <video id="bubble-video" playsinline></video>
+  <div class="bubble-paused-hint">▶</div>
 </div>
 
 <nav class="preso-nav" id="preso-nav">
@@ -1544,12 +1594,12 @@ notesTextarea.addEventListener('keydown', e => {
 });
 btnNotes.addEventListener('click', toggleNotes);
 
-// ── Voice-over ────────────────────────────────────────────────────────────────
-// Recording (serve mode only): mic button opens a panel with record/stop,
-// preview, and delete. One recording per slide, stored as recordings/<slide>.<ext>;
-// re-recording overwrites. Playback (everywhere): ▶ in the nav when the current
-// slide has audio; once the viewer starts playback, advancing to the next slide
-// auto-plays its recording too (tour mode) until they pause.
+// ── Voice-over / video narration ─────────────────────────────────────────────
+// Recording (serve mode only): mic button opens a panel — audio or camera mode.
+// One recording per slide at recordings/<slide>.<ext>; re-recording overwrites.
+// Playback (everywhere): ▶ in the nav when the slide has a recording. Audio
+// plays invisibly; recordings with a video track render in a floating,
+// draggable bubble. Tour mode auto-continues across slides until paused.
 const btnVoice      = document.getElementById('btn-voice');
 const btnRecord     = document.getElementById('btn-record');
 const voicePanel    = document.getElementById('voice-panel');
@@ -1562,6 +1612,10 @@ const voiceSlideEl  = document.getElementById('voice-slide-name');
 const voiceStatusEl = document.getElementById('voice-status');
 const voiceIconPlay  = document.getElementById('voice-icon-play');
 const voiceIconPause = document.getElementById('voice-icon-pause');
+const bubble        = document.getElementById('video-bubble');
+const bubbleVideo   = document.getElementById('bubble-video');
+const modeAudioBtn  = document.getElementById('mode-audio');
+const modeVideoBtn  = document.getElementById('mode-video');
 
 let recordings   = window.FUCKSLIDES_RECORDINGS || {};
 let voiceOpen    = false;
@@ -1571,7 +1625,18 @@ let mediaRec     = null;
 let recChunks    = [];
 let recTimerInt  = null;
 let recStartTs   = 0;
-const voiceAudio = new Audio();
+let recMode      = localStorage.getItem('fs-voice-mode') || 'audio';
+let bubbleLive   = false;   // bubble is showing the live camera preview
+
+function setMode(m) {
+  recMode = m;
+  localStorage.setItem('fs-voice-mode', m);
+  modeAudioBtn.classList.toggle('active', m === 'audio');
+  modeVideoBtn.classList.toggle('active', m === 'video');
+}
+modeAudioBtn.addEventListener('click', () => setMode('audio'));
+modeVideoBtn.addEventListener('click', () => setMode('video'));
+setMode(recMode);
 
 // Mic only appears when the serve API is actually reachable — never for
 // viewers of an exported/deployed player.
@@ -1586,47 +1651,98 @@ function recordingUrl(file) {
   return recordings[file] ? recordings[file] + '?v=' + recVersion : null;
 }
 
+function isPlaying() { return !bubbleLive && !bubbleVideo.paused && !bubbleVideo.ended && bubbleVideo.src; }
+
 function updateVoiceUI() {
   const has = !!recordings[slides[idx]];
   btnVoice.style.display = has ? '' : 'none';
-  const playing = has && !voiceAudio.paused && !voiceAudio.ended;
+  const playing = has && isPlaying();
   voiceIconPlay.style.display  = playing ? 'none' : '';
   voiceIconPause.style.display = playing ? '' : 'none';
   btnVoice.classList.toggle('playing', playing);
+  if (!bubbleLive) {
+    const hasVideoTrack = bubbleVideo.videoWidth > 0 && bubbleVideo.src;
+    const midPlayback = bubbleVideo.src && !bubbleVideo.ended;
+    bubble.style.display = (hasVideoTrack && midPlayback) ? 'block' : 'none';
+    bubble.classList.toggle('paused', hasVideoTrack && bubbleVideo.paused && !bubbleVideo.ended);
+  }
   if (voiceOpen) loadVoicePanelForSlide();
 }
 
 function voiceToggle() {
-  if (!recordings[slides[idx]]) return;
-  if (!voiceAudio.paused && !voiceAudio.ended) {
-    voiceAudio.pause();
+  if (!recordings[slides[idx]] || bubbleLive) return;
+  if (isPlaying()) {
+    bubbleVideo.pause();
     voiceTour = false;
+  } else if (bubbleVideo.src && bubbleVideo.paused && !bubbleVideo.ended) {
+    voiceTour = true;
+    bubbleVideo.play().catch(() => {});
   } else {
     voiceTour = true;
     playVoiceForSlide();
   }
-  updateVoiceUI();
 }
 
 function playVoiceForSlide() {
   const url = recordingUrl(slides[idx]);
   if (!url) return;
-  voiceAudio.src = url;
-  voiceAudio.play().catch(() => {});
+  bubbleVideo.srcObject = null;
+  bubble.classList.remove('mirrored', 'rec-preview');
+  bubbleVideo.muted = false;
+  bubbleVideo.src = url;
+  bubbleVideo.play().catch(() => {});
 }
 
-voiceAudio.addEventListener('play',  updateVoiceUI);
-voiceAudio.addEventListener('pause', updateVoiceUI);
-voiceAudio.addEventListener('ended', updateVoiceUI);
+bubbleVideo.addEventListener('loadedmetadata', updateVoiceUI);
+bubbleVideo.addEventListener('play',  updateVoiceUI);
+bubbleVideo.addEventListener('pause', updateVoiceUI);
+bubbleVideo.addEventListener('ended', () => { bubbleVideo.removeAttribute('src'); bubbleVideo.load(); updateVoiceUI(); });
+
+function stopPlayback() {
+  bubbleVideo.pause();
+  bubbleVideo.removeAttribute('src');
+  bubbleVideo.load();
+}
 
 function voiceOnSlideChange() {
-  voiceAudio.pause();
-  voiceAudio.removeAttribute('src');
+  if (bubbleLive) return;             // don't disturb a live recording preview
+  stopPlayback();
   if (voiceTour && recordings[slides[idx]]) playVoiceForSlide();
   updateVoiceUI();
 }
 
 btnVoice.addEventListener('click', voiceToggle);
+
+// Click bubble to pause/resume; drag to move it
+bubble.addEventListener('click', e => {
+  if (bubble._dragged || bubbleLive) { bubble._dragged = false; return; }
+  voiceToggle();
+});
+(function makeDraggable() {
+  let sx, sy, ox, oy;
+  bubble.addEventListener('pointerdown', e => {
+    sx = e.clientX; sy = e.clientY;
+    const r = bubble.getBoundingClientRect();
+    ox = r.left; oy = r.top;
+    bubble.setPointerCapture(e.pointerId);
+    bubble.classList.add('dragging');
+    bubble._dragged = false;
+    function move(ev) {
+      const dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (Math.abs(dx) + Math.abs(dy) > 5) bubble._dragged = true;
+      bubble.style.left = Math.max(0, Math.min(window.innerWidth - 200, ox + dx)) + 'px';
+      bubble.style.top  = Math.max(0, Math.min(window.innerHeight - 200, oy + dy)) + 'px';
+      bubble.style.bottom = 'auto';
+    }
+    function up(ev) {
+      bubble.classList.remove('dragging');
+      bubble.removeEventListener('pointermove', move);
+      bubble.removeEventListener('pointerup', up);
+    }
+    bubble.addEventListener('pointermove', move);
+    bubble.addEventListener('pointerup', up);
+  });
+})();
 
 // ── Recorder panel (serve mode) ──
 function fmtTime(s) { return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'); }
@@ -1643,7 +1759,7 @@ function loadVoicePanelForSlide() {
     voicePreview.src = url;
     voicePreview.style.display = '';
     voiceDelBtn.style.display = '';
-    voiceStatusEl.textContent = 'recording saved';
+    voiceStatusEl.textContent = 'recording saved — ▶ or V to play it';
   } else {
     voicePreview.removeAttribute('src');
     voicePreview.style.display = 'none';
@@ -1669,8 +1785,10 @@ function closeVoicePanel() {
 }
 btnRecord.addEventListener('click', () => { voiceOpen ? closeVoicePanel() : openVoicePanel(); });
 
-function pickMime() {
-  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+function pickMime(video) {
+  const candidates = video
+    ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
+    : ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
   for (const c of candidates) {
     if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
   }
@@ -1679,28 +1797,47 @@ function pickMime() {
 
 async function startRecording() {
   if (recordings[slides[idx]] && !confirm('Replace the existing recording for this slide?')) return;
+  const wantVideo = recMode === 'video';
   let stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream = await navigator.mediaDevices.getUserMedia(
+      wantVideo ? { audio: true, video: { width: 1280, height: 720, facingMode: 'user' } }
+                : { audio: true });
   } catch (e) {
-    voiceStatusEl.textContent = 'microphone access denied';
+    voiceStatusEl.textContent = wantVideo ? 'camera/mic access denied' : 'microphone access denied';
     return;
   }
-  voiceAudio.pause();
+  stopPlayback();
   recChunks = [];
-  const mime = pickMime();
+  const mime = pickMime(wantVideo);
   mediaRec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
   mediaRec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
   mediaRec.onstop = () => {
     stream.getTracks().forEach(t => t.stop());
+    bubbleLive = false;
+    bubbleVideo.srcObject = null;
+    bubble.classList.remove('mirrored', 'rec-preview');
+    bubble.style.display = 'none';
     uploadRecording(new Blob(recChunks, { type: mediaRec.mimeType }));
   };
+
+  // live self-view while recording video
+  if (wantVideo) {
+    bubbleLive = true;
+    bubbleVideo.srcObject = stream;
+    bubbleVideo.muted = true;
+    bubble.classList.add('mirrored', 'rec-preview');
+    bubble.classList.remove('paused');
+    bubble.style.display = 'block';
+    bubbleVideo.play().catch(() => {});
+  }
+
   mediaRec.start();
   recStartTs = Date.now();
   voiceRecBtn.classList.add('recording');
   btnRecord.classList.add('rec-live');
   voiceRecLabel.textContent = 'Stop';
-  voiceStatusEl.textContent = 'recording…';
+  voiceStatusEl.textContent = wantVideo ? 'recording camera + mic…' : 'recording…';
   voicePreview.style.display = 'none';
   voiceDelBtn.style.display = 'none';
   voiceTimerEl.textContent = '0:00';
@@ -1721,7 +1858,8 @@ function stopRecording() {
 
 function uploadRecording(blob) {
   const file = slides[idx];
-  const ext  = blob.type.includes('mp4') ? 'm4a' : 'webm';
+  const isVideo = blob.type.startsWith('video');
+  const ext = blob.type.includes('mp4') ? (isVideo ? 'mp4' : 'm4a') : 'webm';
   fetch('/api/save-recording?file=' + encodeURIComponent(file) + '&ext=' + ext, {
     method: 'POST',
     headers: { 'Content-Type': blob.type || 'application/octet-stream' },
@@ -1753,6 +1891,7 @@ voiceDelBtn.addEventListener('click', () => {
   .then(d => {
     if (!d.ok) { voiceStatusEl.textContent = 'delete failed'; return; }
     delete recordings[file];
+    stopPlayback();
     voiceStatusEl.textContent = 'recording deleted';
     loadVoicePanelForSlide();
     updateVoiceUI();

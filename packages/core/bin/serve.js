@@ -10,10 +10,10 @@ const MIME = {
   '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
   '.gif': 'image/gif', '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2', '.woff': 'font/woff',
-  '.webm': 'audio/webm', '.m4a': 'audio/mp4', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav',
+  '.webm': 'video/webm', '.m4a': 'audio/mp4', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.mp4': 'video/mp4',
 };
 
-const AUDIO_EXTS = ['.webm', '.m4a', '.mp3', '.ogg', '.wav'];
+const AUDIO_EXTS = ['.webm', '.m4a', '.mp3', '.ogg', '.wav', '.mp4'];
 
 module.exports = function serve(config) {
   const cwd       = process.cwd();

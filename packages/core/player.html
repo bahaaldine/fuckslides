@@ -258,6 +258,13 @@
     }
     .voice-slide-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.62rem; color: rgba(255,255,255,0.2); text-transform: none; letter-spacing: 0; font-weight: 400; }
     .voice-status { margin-left: auto; font-size: 0.58rem; color: rgba(255,255,255,0.35); text-transform: none; letter-spacing: 0.02em; font-weight: 500; }
+    .voice-pop-btn {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.6); border-radius: 6px; padding: 3px 9px;
+      font-family: 'Inter', -apple-system, sans-serif; font-size: 0.6rem; font-weight: 600;
+      cursor: pointer; text-transform: none; letter-spacing: 0.02em;
+    }
+    .voice-pop-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
     /* Teleprompter: the slide's speaker notes, readable while recording */
     .voice-notes {
       flex: 1; min-height: 0; overflow-y: auto;
@@ -521,6 +528,7 @@
   <div class="voice-header">
     <span>Voice-over</span>
     <span class="voice-slide-name" id="voice-slide-name"></span>
+    <button class="voice-pop-btn" id="voice-pop-btn" title="Pop notes out — position them under your camera">⇱ Pop out notes</button>
     <span class="voice-status" id="voice-status"></span>
   </div>
   <div class="voice-notes" id="voice-notes"></div>
@@ -1981,6 +1989,7 @@ function loadVoicePanelForSlide() {
   voiceNotesEl.textContent = note || 'No speaker notes for this slide — press N to write some, they\'ll show here as your talk track.';
   voiceNotesEl.classList.toggle('empty', !note);
   voiceNotesEl.scrollTop = 0;
+  updateTeleprompter();
   const url = recordingUrl(slides[idx]);
   if (url && !isRecording()) {
     voicePreview.src = url;
@@ -1996,6 +2005,54 @@ function loadVoicePanelForSlide() {
 }
 
 function isRecording() { return mediaRec && mediaRec.state === 'recording'; }
+
+// ── Pop-out teleprompter ──
+// A small always-separate window you can drag right under the webcam so
+// your eyes stay at camera level while recording. Mirrors the current
+// slide's notes plus a live REC indicator and timer.
+let tpWin = null;
+function openTeleprompter() {
+  if (tpWin && !tpWin.closed) { tpWin.focus(); updateTeleprompter(); return; }
+  tpWin = window.open('', 'fs-teleprompter', 'width=620,height=360');
+  if (!tpWin) return;   // popup blocked
+  tpWin.document.write('<!DOCTYPE html><html><head><title>Teleprompter</title><style>' +
+    'body{margin:0;background:#111318;color:rgba(255,255,255,0.88);font-family:Inter,-apple-system,sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}' +
+    '.head{flex-shrink:0;display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,0.08);font-family:ui-monospace,SF Mono,monospace;font-size:12px}' +
+    '#rec{color:rgba(255,255,255,0.25);font-weight:700;letter-spacing:0.08em}' +
+    '#rec.on{color:#EF4444;animation:bl 1.1s ease-in-out infinite}' +
+    '@keyframes bl{50%{opacity:0.35}}' +
+    '#time{color:rgba(255,255,255,0.6);font-weight:700}' +
+    '#slide{margin-left:auto;color:rgba(255,255,255,0.25)}' +
+    '#notes{flex:1;overflow-y:auto;padding:18px 26px;font-size:1.35rem;line-height:1.8;white-space:pre-wrap}' +
+    '#notes.empty{color:rgba(255,255,255,0.25);font-style:italic}' +
+    '</style></head><body>' +
+    '<div class="head"><span id="rec">● REC</span><span id="time">0:00</span><span id="slide"></span></div>' +
+    '<div id="notes"></div></body></html>');
+  tpWin.document.close();
+  updateTeleprompter();
+}
+function updateTeleprompter() {
+  if (!tpWin || tpWin.closed) return;
+  try {
+    const d = tpWin.document;
+    const note = (allNotes[slides[idx]] || '').trim();
+    const n = d.getElementById('notes');
+    n.textContent = note || 'No speaker notes for this slide.';
+    n.classList.toggle('empty', !note);
+    n.scrollTop = 0;
+    d.getElementById('slide').textContent = slides[idx];
+  } catch (_) {}
+}
+function tpSetRec(on) {
+  if (!tpWin || tpWin.closed) return;
+  try { tpWin.document.getElementById('rec').className = on ? 'on' : ''; } catch (_) {}
+}
+function tpSetTime(t) {
+  if (!tpWin || tpWin.closed) return;
+  try { tpWin.document.getElementById('time').textContent = t; } catch (_) {}
+}
+document.getElementById('voice-pop-btn').addEventListener('click', openTeleprompter);
+window.addEventListener('beforeunload', () => { if (tpWin && !tpWin.closed) tpWin.close(); });
 
 // ── Live waveform while recording ──
 const voiceWave = document.getElementById('voice-wave');
@@ -2136,11 +2193,13 @@ async function startRecording() {
     voiceStatusEl.textContent = wantVideo ? '● recording camera + mic' : '● recording';
     voiceTimerEl.textContent = '0:00';
     startWave(stream);
+    tpSetRec(true);
     recTimerInt = setInterval(() => {
       const t = fmtTime((Date.now() - recStartTs) / 1000);
       voiceTimerEl.textContent = t;
       const bt = document.getElementById('bubble-rec-time');
       if (bt) bt.textContent = t;
+      tpSetTime(t);
     }, 250);
   };
   voicePreview.style.display = 'none';
@@ -2153,6 +2212,7 @@ function stopRecording() {
   mediaRec.stop();
   clearInterval(recTimerInt);
   stopWave();
+  tpSetRec(false);
   voiceRecBtn.classList.remove('recording');
   btnRecord.classList.remove('rec-live');
   voiceRecLabel.textContent = 'Record';

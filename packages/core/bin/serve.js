@@ -78,8 +78,56 @@ window.FUCKSLIDES_DISABLED  = ${disabledJson};
     }
   }
 
+  // ── Live reload ────────────────────────────────────────────────────────────
+  // Watches slidesDir (+ fuckslides.config.js) and pushes an SSE 'reload' event
+  // to every connected player tab so edits show up without restarting `serve`
+  // or manually refreshing the browser.
+  const sseClients = new Set();
+
+  function broadcastReload() {
+    for (const res of sseClients) {
+      res.write('event: reload\ndata: {}\n\n');
+    }
+  }
+
+  let reloadDebounce = null;
+  function scheduleReload() {
+    clearTimeout(reloadDebounce);
+    // Coalesce the burst of fs events a single editor save can fire (write + rename).
+    reloadDebounce = setTimeout(broadcastReload, 120);
+  }
+
+  function watchPath(target, recursive) {
+    if (!fs.existsSync(target)) return;
+    try {
+      fs.watch(target, { recursive }, () => scheduleReload());
+    } catch (e) {
+      // Recursive watching isn't supported on all platforms (e.g. older Linux
+      // kernels via Node's inotify backend). Fall back to a flat watch so
+      // top-level slide edits still trigger a reload.
+      if (recursive && e.code === 'ERR_FEATURE_UNAVAILABLE_ON_PLATFORM') {
+        try { fs.watch(target, () => scheduleReload()); } catch (_) {}
+      }
+    }
+  }
+
+  watchPath(slidesDir, true);
+  watchPath(cfgPath, false);
+
   const server = http.createServer((req, res) => {
     let urlPath = req.url.split('?')[0];
+
+    if (req.method === 'GET' && urlPath === '/api/sse') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      res.write('\n');
+      sseClients.add(res);
+      req.on('close', () => sseClients.delete(res));
+      return;
+    }
 
     if (req.method === 'GET' && urlPath === '/api/source') {
       const fileParam = new URL(req.url, 'http://localhost').searchParams.get('file');

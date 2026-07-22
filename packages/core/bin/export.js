@@ -61,19 +61,43 @@ module.exports = async function exportPresentation(config, outputPath) {
   const pkgDir   = path.join(__dirname, '..');
   const out      = outputPath || path.join(cwd, (config.name || 'presentation') + '.html');
 
+  // Inline fuckslides.js (needed both in player and in each slide srcdoc)
+  const fsJsPath = path.join(pkgDir, 'js', 'fuckslides.js');
+  const fsJs = fs.existsSync(fsJsPath) ? fs.readFileSync(fsJsPath, 'utf8') : '';
+
   // Read all slide HTML and inline their local assets
   const slideContents = {};
   for (const slide of config.slides) {
     const p = path.join(slidesDir, slide);
     if (fs.existsSync(p)) {
       const raw = fs.readFileSync(p, 'utf8');
-      slideContents[slide] = inlineAssets(inlineIframes(raw, slidesDir), slidesDir);
+      let content = inlineAssets(inlineIframes(raw, slidesDir), slidesDir);
+
+      // Inline <link rel="stylesheet" href="..."> → <style> blocks.
+      // inlineAssets handles src= and url() but not href= on link elements.
+      content = content.replace(
+        /<link\s+rel=["']stylesheet["']\s+href=["']([^"']+)["']\s*\/?>/gi,
+        (match, href) => {
+          if (/^(https?:|data:|#|\/\/)/.test(href)) return match;
+          const abs = path.resolve(slidesDir, href);
+          if (!fs.existsSync(abs)) return match;
+          return `<style>\n${fs.readFileSync(abs, 'utf8')}\n</style>`;
+        }
+      );
+
+      // Inline <script src="/js/fuckslides.js"> — absolute path, skipped by
+      // inlineAssets. Each slide srcdoc needs its own copy to fire reveal
+      // animations and relay keydown events to the parent player.
+      if (fsJs) {
+        content = content.replace(
+          /<script\s+src=["']\/js\/fuckslides\.js["']\s*><\/script>/g,
+          `<script>${fsJs}<\/script>`
+        );
+      }
+
+      slideContents[slide] = content;
     }
   }
-
-  // Inline fuckslides.js
-  const fsJsPath = path.join(pkgDir, 'js', 'fuckslides.js');
-  const fsJs = fs.existsSync(fsJsPath) ? fs.readFileSync(fsJsPath, 'utf8') : '';
 
   // Logo as base64 data URI
   const logoPath = path.join(pkgDir, 'logo.png');

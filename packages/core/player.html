@@ -666,6 +666,13 @@
 <script>
 'use strict';
 
+// Sandbox-safe localStorage shim — falls back silently when the document is
+// served in a sandboxed context (e.g. CSP `sandbox` without allow-same-origin).
+const _ls = (() => {
+  try { void localStorage; return localStorage; }
+  catch (_) { return { getItem: () => null, setItem: () => {}, removeItem: () => {} }; }
+})();
+
 // Injected by the dev server; falls back gracefully for direct file:// open
 const SLIDES_DEFAULT = window.FUCKSLIDES_SLIDES || [];
 const LABELS_DEFAULT = window.FUCKSLIDES_LABELS || SLIDES_DEFAULT.map(s => s.replace('.html', ''));
@@ -679,14 +686,14 @@ let disabled = new Set(DISABLED_DEFAULT);
 
 function loadOrder() {
   try {
-    const saved = JSON.parse(localStorage.getItem(LS_KEY));
+    const saved = JSON.parse(_ls.getItem(LS_KEY));
     if (Array.isArray(saved) && saved.length === SLIDES_DEFAULT.length &&
         saved.every(s => SLIDES_DEFAULT.includes(s))) return saved;
   } catch (_) {}
   return [...SLIDES_DEFAULT];
 }
 
-function saveOrder() { localStorage.setItem(LS_KEY, JSON.stringify(slides)); }
+function saveOrder() { _ls.setItem(LS_KEY, JSON.stringify(slides)); }
 function isDefaultOrder() { return slides.every((s, i) => s === SLIDES_DEFAULT[i]); }
 
 const slideWrapper  = document.getElementById('slide-wrapper');
@@ -1150,7 +1157,7 @@ btnReset.addEventListener('click', () => {
   const currentSlide = slides[idx];
   slides = [...SLIDES_DEFAULT]; labels = [...LABELS_DEFAULT];
   slides.forEach(s => { const t = ovGrid.querySelector(`[data-slide="${s}"]`); if (t) ovGrid.appendChild(t); });
-  refreshThumbCounters(); localStorage.removeItem(LS_KEY);
+  refreshThumbCounters(); _ls.removeItem(LS_KEY);
   idx = slides.indexOf(currentSlide); go(idx); updateThumbHighlight();
 });
 
@@ -1669,14 +1676,14 @@ let mediaRec     = null;
 let recChunks    = [];
 let recTimerInt  = null;
 let recStartTs   = 0;
-let recMode      = localStorage.getItem('fs-voice-mode') || 'audio';
+let recMode      = _ls.getItem('fs-voice-mode') || 'audio';
 let bubbleLive   = false;   // bubble is showing the live camera preview
 
 const micSel = document.getElementById('voice-mic-sel');
 const camSel = document.getElementById('voice-cam-sel');
 
 function fillDeviceSel(sel, devs, key, defLabel, kindLabel) {
-  const saved = localStorage.getItem(key) || '';
+  const saved = _ls.getItem(key) || '';
   sel.innerHTML = '';
   const d0 = document.createElement('option');
   d0.value = ''; d0.textContent = defLabel;
@@ -1717,8 +1724,8 @@ async function refreshDevices() {
     fillDeviceSel(camSel, devs.filter(d => d.kind === 'videoinput'), 'fs-voice-cam', 'Default camera', 'Camera');
   } catch (_) {}
 }
-micSel.addEventListener('change', () => localStorage.setItem('fs-voice-mic', micSel.value));
-camSel.addEventListener('change', () => localStorage.setItem('fs-voice-cam', camSel.value));
+micSel.addEventListener('change', () => _ls.setItem('fs-voice-mic', micSel.value));
+camSel.addEventListener('change', () => _ls.setItem('fs-voice-cam', camSel.value));
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
   navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
 }
@@ -1732,19 +1739,19 @@ const bgBlurBtn  = document.getElementById('bg-blur');
 const bgImageBtn = document.getElementById('bg-image');
 const bgFileInp  = document.getElementById('bg-file');
 const bgWrap     = document.getElementById('voice-bg');
-let bgMode  = localStorage.getItem('fs-voice-bg') || 'none';
+let bgMode  = _ls.getItem('fs-voice-bg') || 'none';
 let bgImage = null;
 let segmenter = null, segLoading = null;
 
 (function restoreBgImage() {
-  const d = localStorage.getItem('fs-voice-bg-img');
+  const d = _ls.getItem('fs-voice-bg-img');
   if (d) { bgImage = new Image(); bgImage.src = d; }
 })();
 
 function setBg(m) {
   if (m === 'image' && !bgImage) { bgFileInp.click(); return; }
   bgMode = m;
-  localStorage.setItem('fs-voice-bg', m);
+  _ls.setItem('fs-voice-bg', m);
   bgNoneBtn.classList.toggle('active', m === 'none');
   bgBlurBtn.classList.toggle('active', m === 'blur');
   bgImageBtn.classList.toggle('active', m === 'image');
@@ -1766,7 +1773,7 @@ bgFileInp.addEventListener('change', () => {
     const w = img.width * scale, h = img.height * scale;
     g.drawImage(img, (1280 - w) / 2, (720 - h) / 2, w, h);
     const data = c.toDataURL('image/jpeg', 0.82);
-    try { localStorage.setItem('fs-voice-bg-img', data); } catch (_) {}
+    _ls.setItem('fs-voice-bg-img', data);
     bgImage = new Image(); bgImage.src = data;
     setBg('image');
   };
@@ -1863,7 +1870,7 @@ async function buildVirtualBgStream(rawStream) {
 
 function setMode(m) {
   recMode = m;
-  localStorage.setItem('fs-voice-mode', m);
+  _ls.setItem('fs-voice-mode', m);
   modeAudioBtn.classList.toggle('active', m === 'audio');
   modeVideoBtn.classList.toggle('active', m === 'video');
   camSel.style.display = m === 'video' ? '' : 'none';

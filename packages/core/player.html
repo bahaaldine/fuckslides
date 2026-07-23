@@ -265,6 +265,53 @@
       cursor: pointer; text-transform: none; letter-spacing: 0.02em;
     }
     .voice-pop-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+    /* ── Comments (GitHub issues) ── */
+    #comments-panel {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 300px;
+      background: rgba(10,12,18,0.98); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255,255,255,0.10); z-index: 8880;
+      transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.2,0,0.2,1);
+      display: flex; flex-direction: column;
+    }
+    #comments-panel.open { transform: translateY(0); }
+    .comments-header {
+      flex-shrink: 0; display: flex; align-items: center; gap: 0.8rem;
+      padding: 0.45rem 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.07);
+      font-family: 'Inter', -apple-system, sans-serif; font-size: 0.58rem; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.35);
+    }
+    .comments-slide-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.62rem; color: rgba(255,255,255,0.2); text-transform: none; letter-spacing: 0; font-weight: 400; }
+    .comments-add {
+      margin-left: auto;
+      background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.35);
+      color: #38BDF8; border-radius: 6px; padding: 3px 10px;
+      font-family: 'Inter', -apple-system, sans-serif; font-size: 0.6rem; font-weight: 600;
+      cursor: pointer; text-decoration: none; text-transform: none; letter-spacing: 0.02em;
+    }
+    .comments-add:hover { background: rgba(56,189,248,0.2); }
+    #comments-list {
+      flex: 1; min-height: 0; overflow-y: auto; padding: 10px 1.1rem 70px;
+      scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent;
+    }
+    .comment-item {
+      display: flex; gap: 10px; padding: 9px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .comment-avatar { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; background: rgba(255,255,255,0.08); }
+    .comment-body { flex: 1; min-width: 0; }
+    .comment-meta { font-size: 0.64rem; color: rgba(255,255,255,0.35); margin-bottom: 3px; font-family: 'Inter', -apple-system, sans-serif; }
+    .comment-meta strong { color: rgba(255,255,255,0.75); font-weight: 600; }
+    .comment-text { font-size: 0.78rem; line-height: 1.55; color: rgba(255,255,255,0.7); font-family: 'Inter', -apple-system, sans-serif; white-space: pre-wrap; word-break: break-word; }
+    .comments-empty { padding: 24px 0; text-align: center; font-size: 0.72rem; color: rgba(255,255,255,0.25); font-style: italic; font-family: 'Inter', -apple-system, sans-serif; }
+    .comments-empty a { color: #38BDF8; text-decoration: none; }
+    .nav-btn .comment-count {
+      position: absolute; top: -3px; right: -3px;
+      min-width: 13px; height: 13px; border-radius: 7px; padding: 0 3px;
+      background: #38BDF8; color: #0d0f14; font-size: 8px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Inter', -apple-system, sans-serif;
+    }
     /* Teleprompter: the slide's speaker notes, readable while recording */
     .voice-notes {
       flex: 1; min-height: 0; overflow-y: auto;
@@ -553,6 +600,15 @@
   </div>
 </div>
 
+<div id="comments-panel">
+  <div class="comments-header">
+    <span>Comments</span>
+    <span class="comments-slide-name" id="comments-slide-name"></span>
+    <a class="comments-add" id="comments-add" target="_blank" rel="noopener">+ Comment on GitHub</a>
+  </div>
+  <div id="comments-list"></div>
+</div>
+
 <div id="video-bubble">
   <video id="bubble-video" playsinline></video>
   <div class="bubble-paused-hint">▶</div>
@@ -589,6 +645,10 @@
   </button>
   <button class="nav-btn" id="btn-record" title="Record voice-over" style="display:none">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="1.5" width="4" height="8" rx="2"/><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5"/></svg>
+  </button>
+  <button class="nav-btn" id="btn-comments" title="Comments (K)" style="display:none; position:relative;">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 10a1.5 1.5 0 0 1-1.5 1.5H6l-3.5 3v-3H3.5A1.5 1.5 0 0 1 2 10V3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5V10z"/></svg>
+    <span class="comment-count" id="comment-count" style="display:none"></span>
   </button>
   <button class="nav-btn" id="btn-notes" title="Speaker notes (N)">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="10" rx="1.5"/><path d="M5 6h6M5 8.5h4"/></svg>
@@ -781,6 +841,7 @@ function go(newIdx) {
     if (fsBuilt) updateFilmstripHighlight();
     if (notesOpen) loadNotesForSlide();
     voiceOnSlideChange();
+    commentsOnSlideChange();
     broadcastPresenterState();
   };
 
@@ -1176,6 +1237,7 @@ function handleKey(key) {
   if (key === 't' || key === 'T') { toggleFilmstrip(); return; }
   if (key === 'n' || key === 'N') { toggleNotes(); return; }
   if (key === 'v' || key === 'V') { voiceToggle(); return; }
+  if (key === 'k' || key === 'K') { toggleComments(); return; }
   if (key === 'p' || key === 'P') { openPresenterView(); return; }
   if (key === 'l' || key === 'L') { toggleLaser(); return; }
   if (key === 'd' || key === 'D') { if (!ovOpen) { toggleDraw(); return; } }
@@ -1186,6 +1248,7 @@ function handleKey(key) {
     if (laserMode) { deactivateLaser(); return; }
     if (drawMode)  { deactivateDraw();  return; }
     if (voiceOpen) { closeVoicePanel(); return; }
+    if (commentsOpen) { closeComments(); return; }
     if (ovOpen) { closeOverview(); return; } if (fsOpen) { closeFilmstrip(); return; }
   }
   if (ovOpen) {
@@ -1651,6 +1714,150 @@ notesTextarea.addEventListener('keydown', e => {
   if (e.key === 'Escape') { e.preventDefault(); closeNotes(); }
 });
 btnNotes.addEventListener('click', toggleNotes);
+
+// ── Comments — backed by GitHub issues ───────────────────────────────────────
+// One issue per slide, created lazily: "+ Comment" deep-links to a prefilled
+// new-issue form (or the existing slide issue), so any GitHub user can comment
+// with zero auth wiring. Existing comments are fetched from the public REST
+// API — works identically under `fslides serve` and on a published static
+// deck. The repo comes from config.repo or the git remote at serve/build time.
+const REPO = window.FUCKSLIDES_REPO || null;
+const btnComments      = document.getElementById('btn-comments');
+const commentsPanel    = document.getElementById('comments-panel');
+const commentsListEl   = document.getElementById('comments-list');
+const commentsSlideEl  = document.getElementById('comments-slide-name');
+const commentsAddEl    = document.getElementById('comments-add');
+const commentCountEl   = document.getElementById('comment-count');
+let commentsOpen = false;
+const commentsCache = {};   // slide -> { issue, comments: [...] }
+
+function slideIssueTitle(file) { return '\ud83d\udcac Slide: ' + file; }
+
+function ghHeaders() { return { Accept: 'application/vnd.github+json' }; }
+
+async function fetchSlideIssue(file) {
+  if (commentsCache[file]) return commentsCache[file];
+  const q = encodeURIComponent(`repo:${REPO} in:title "${slideIssueTitle(file)}"`);
+  const r = await fetch('https://api.github.com/search/issues?q=' + q, { headers: ghHeaders() });
+  if (!r.ok) throw new Error('gh api ' + r.status);
+  const data = await r.json();
+  const issue = (data.items || []).find(i => i.title === slideIssueTitle(file)) || null;
+  let comments = [];
+  if (issue) {
+    // the issue body is the first comment
+    if (issue.body && issue.body.trim()) {
+      comments.push({ user: issue.user, body: issue.body, created_at: issue.created_at });
+    }
+    if (issue.comments > 0) {
+      const cr = await fetch(issue.comments_url + '?per_page=100', { headers: ghHeaders() });
+      if (cr.ok) comments = comments.concat(await cr.json());
+    }
+  }
+  const entry = { issue, comments };
+  commentsCache[file] = entry;
+  return entry;
+}
+
+function newIssueUrl(file) {
+  const label = labels[slides.indexOf(file)] || file;
+  const title = slideIssueTitle(file);
+  const body  = `Feedback on **${label}** (\`${file}\`).\n\n<!-- Add your comment below. Further feedback on this slide: comment on this issue rather than opening a new one. -->\n\n`;
+  return `https://github.com/${REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+}
+
+function renderComments(file, entry) {
+  commentsSlideEl.textContent = file;
+  commentsAddEl.href = entry.issue ? entry.issue.html_url : newIssueUrl(file);
+  commentsListEl.innerHTML = '';
+  if (!entry.comments.length) {
+    const d = document.createElement('div');
+    d.className = 'comments-empty';
+    d.textContent = 'No comments on this slide yet — be the first.';
+    commentsListEl.appendChild(d);
+    return;
+  }
+  for (const c of entry.comments) {
+    const item = document.createElement('div');
+    item.className = 'comment-item';
+    const av = document.createElement('img');
+    av.className = 'comment-avatar';
+    av.src = (c.user && c.user.avatar_url) ? c.user.avatar_url + '&s=52' : '';
+    av.onerror = function() { this.style.visibility = 'hidden'; };
+    const body = document.createElement('div');
+    body.className = 'comment-body';
+    const meta = document.createElement('div');
+    meta.className = 'comment-meta';
+    const who = document.createElement('strong');
+    who.textContent = (c.user && c.user.login) || 'unknown';
+    meta.appendChild(who);
+    meta.appendChild(document.createTextNode(' · ' + new Date(c.created_at).toLocaleDateString()));
+    const text = document.createElement('div');
+    text.className = 'comment-text';
+    text.textContent = c.body || '';
+    body.appendChild(meta); body.appendChild(text);
+    item.appendChild(av); item.appendChild(body);
+    commentsListEl.appendChild(item);
+  }
+}
+
+async function loadCommentsForSlide() {
+  if (!REPO) return;
+  const file = slides[idx];
+  commentsSlideEl.textContent = file;
+  commentsAddEl.href = newIssueUrl(file);
+  commentsListEl.innerHTML = '<div class="comments-empty">loading…</div>';
+  try {
+    const entry = await fetchSlideIssue(file);
+    if (slides[idx] === file) renderComments(file, entry);
+  } catch (_) {
+    // Private repo (API can't read it anonymously) or rate-limited: the panel
+    // becomes a launcher — GitHub's own UI works fine with the viewer's session.
+    const issuesUrl = 'https://github.com/' + REPO + '/issues?q=' + encodeURIComponent('in:title "' + slideIssueTitle(file) + '"');
+    commentsListEl.innerHTML = '';
+    const d = document.createElement('div');
+    d.className = 'comments-empty';
+    d.appendChild(document.createTextNode('Comments for this deck live on GitHub (private repo or rate limit). '));
+    const a = document.createElement('a');
+    a.href = issuesUrl; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = 'Open this slide\u2019s comments \u2197';
+    d.appendChild(a);
+    commentsListEl.appendChild(d);
+  }
+}
+
+function updateCommentBadge() {
+  if (!REPO) return;
+  const entry = commentsCache[slides[idx]];
+  const n = entry ? entry.comments.length : 0;
+  commentCountEl.style.display = n ? 'flex' : 'none';
+  commentCountEl.textContent = n > 9 ? '9+' : n;
+}
+
+function openComments() {
+  if (notesOpen) closeNotes();
+  if (voiceOpen) closeVoicePanel();
+  commentsOpen = true;
+  commentsPanel.classList.add('open');
+  btnComments.classList.add('active');
+  loadCommentsForSlide().then(updateCommentBadge);
+}
+function closeComments() {
+  commentsOpen = false;
+  commentsPanel.classList.remove('open');
+  btnComments.classList.remove('active');
+}
+function toggleComments() { commentsOpen ? closeComments() : openComments(); }
+
+function commentsOnSlideChange() {
+  if (!REPO) return;
+  updateCommentBadge();
+  if (commentsOpen) loadCommentsForSlide().then(updateCommentBadge);
+}
+
+if (REPO) {
+  btnComments.style.display = '';
+  btnComments.addEventListener('click', toggleComments);
+}
 
 // ── Voice-over / video narration ─────────────────────────────────────────────
 // Recording (serve mode only): mic button opens a panel — audio or camera mode.

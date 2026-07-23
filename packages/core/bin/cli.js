@@ -54,6 +54,12 @@ switch (cmd) {
   case 'publish':
     require('./publish')(loadConfig(process.cwd()));
     break;
+  case 'build':
+    require('./build')(loadConfig(process.cwd()), args[0] && !args[0].startsWith('-') ? args[0] : undefined);
+    break;
+  case 'scaffold':
+    require('./scaffold')(args[0], { private: args.includes('--private'), org: getFlag('--org') });
+    break;
   default:
     console.log(`
   fuckSlides — no-bullshit HTML presentations
@@ -67,7 +73,9 @@ switch (cmd) {
     fuckslides gif <slide>            Export a slide to animated GIF
     fuckslides export [output.html]   Bundle into a single self-contained HTML file
     fuckslides add-slide <name>       Add a new slide (--template title|stat|quote|split|bullets|cover)
-    fuckslides publish                Deploy to GitHub Pages
+    fuckslides publish                Deploy single-file export to gh-pages branch
+    fuckslides build [outDir]         Build a deployable folder (player + slides + assets)
+    fuckslides scaffold <name>        Create a GitHub repo for a new deck: files, CI to Pages, comments wired (--private, --org <org>)
     fuckslides hub [path|github-url]  Serve all presentations from a hub manifest
 `);
 }

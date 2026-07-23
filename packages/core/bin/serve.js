@@ -27,12 +27,21 @@ module.exports = function serve(config) {
   const nameJson     = JSON.stringify(config.name || 'presentation');
   const titleJson    = JSON.stringify(config.title || config.name || 'presentation');
   const disabledJson = JSON.stringify(config.disabled || []);
+  let repo = config.repo || null;
+  if (!repo) {
+    try {
+      const remote = execSync('git remote get-url origin', { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
+      const m = remote.match(/github\.com[:/]([^/]+)\/([^/.]+)/);
+      if (m) repo = m[1] + '/' + m[2];
+    } catch (_) {}
+  }
   const configSnippet = `<script>
 window.FUCKSLIDES_SLIDES    = ${slidesJson};
 window.FUCKSLIDES_LABELS    = ${labelsJson};
 window.FUCKSLIDES_NAME      = ${nameJson};
 window.FUCKSLIDES_TITLE     = ${titleJson};
 window.FUCKSLIDES_DISABLED  = ${disabledJson};
+window.FUCKSLIDES_REPO      = ${JSON.stringify(repo)};
 </script>`;
 
   const playerTemplate = fs.readFileSync(path.join(pkgDir, 'player.html'), 'utf8');

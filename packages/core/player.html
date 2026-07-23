@@ -944,7 +944,13 @@ function buildFilmstrip() {
     const scale = document.createElement('div');
     scale.className = 'fs-thumb-scale';
     const fr = document.createElement('iframe');
-    fr.src = slide; fr.setAttribute('scrolling', 'no');
+    fr.setAttribute('scrolling', 'no');
+    if (window.FUCKSLIDES_EXPORT && window.FUCKSLIDES_CONTENTS && window.FUCKSLIDES_CONTENTS[slide]) {
+      const _h = window.FUCKSLIDES_CONTENTS[slide].replace(/<script\b[\s\S]*?<\/script>/gi, '');
+      fr.srcdoc = _h.replace('<\/head>', THUMB_FREEZE + '\n<\/head>');
+    } else {
+      fr.src = slide;
+    }
     scale.appendChild(fr);
     const num = document.createElement('div');
     num.className = 'fs-num'; num.textContent = i + 1;
@@ -1049,8 +1055,9 @@ function buildShelf() {
 
         const fr = document.createElement('iframe');
         fr.setAttribute('scrolling', 'no');
-        fetch(slide)
-          .then(r => r.text())
+        (window.FUCKSLIDES_EXPORT && window.FUCKSLIDES_CONTENTS && window.FUCKSLIDES_CONTENTS[slide]
+          ? Promise.resolve(window.FUCKSLIDES_CONTENTS[slide])
+          : fetch(slide).then(r => r.text()))
           .then(html => {
             const noJs = html.replace(/<script\b[\s\S]*?<\/script>/gi, '');
             fr.srcdoc = noJs.replace('</head>', THUMB_FREEZE + '\n</head>');
@@ -1882,6 +1889,12 @@ setMode(recMode);
 
 // Mic only appears when the serve API is actually reachable — never for
 // viewers of an exported/deployed player.
+// Hide server-only controls in exported presentations
+if (window.FUCKSLIDES_EXPORT) {
+  const presBtn = document.getElementById('btn-presenter');
+  if (presBtn) presBtn.style.display = 'none';
+}
+
 if (!window.FUCKSLIDES_EXPORT) {
   fetch('/api/recordings')
     .then(r => { if (!r.ok) throw new Error('no api'); return r.json(); })

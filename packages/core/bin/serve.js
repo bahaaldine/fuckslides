@@ -37,7 +37,7 @@ window.FUCKSLIDES_DISABLED  = ${disabledJson};
 
   const playerTemplate = fs.readFileSync(path.join(pkgDir, 'player.html'), 'utf8');
   const playerHtml     = playerTemplate
-    .replace('<title>Fuckslides</title>', `<title>${config.title || config.name || 'Fuckslides'}</title>`)
+    .replace(/<title>[^<]*<\/title>/, `<title>${config.title || config.name || 'Presentation'}</title>`)
     .replace('</head>', configSnippet + '\n</head>');
 
   // Inject slide manifest into each slide too (for standalone keyboard nav)

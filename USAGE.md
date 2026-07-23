@@ -4,7 +4,7 @@ Quick reference for using `fslides` (this repo, aka "fuckslides") — a no-bulls
 
 ## What it is
 
-`fslides` is a **globally-installed** CLI (`fslides@0.1.0`, symlinked into `/opt/homebrew/bin`, on PATH). It is **not repo-scoped** — run it from any directory that is a "deck".
+`fslides` is a **globally-installed** CLI (`npm install -g fslides`). It is **not repo-scoped** — run it from any directory that is a "deck".
 
 A **deck** is a folder containing:
 - `fuckslides.config.js` — the deck manifest
@@ -49,6 +49,3 @@ By design it skips absolute `http(s):` URLs. Two things stay remote:
 1. The Elastic favicon (`https://www.elastic.co/favicon.svg`) — purely cosmetic (browser-tab icon).
 2. **Only if a slide uses the webcam / selfie-segmentation effect** — MediaPipe is pulled from a CDN at runtime. Core decks that don't use that effect are fully standalone.
 
-## Example deck
-
-`~/repos/kuchi-kopi/drafts/mayzak-1on1-deck/` — `fuckslides.config.js` + 11 slides + `shared.css`, and its exported single-file `.html` (~95 KB).

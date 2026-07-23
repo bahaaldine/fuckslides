@@ -13,13 +13,13 @@ No build step. No lock-in. Every slide is just a file you can open in a browser.
 ## Install
 
 ```bash
-npm install -g fuck-slides
+npm install -g fslides
 ```
 
 Or use without installing:
 
 ```bash
-npx fuck-slides create my-talk
+npx fslides create my-talk
 ```
 
 ---

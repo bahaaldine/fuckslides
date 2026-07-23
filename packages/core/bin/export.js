@@ -122,7 +122,9 @@ window.FUCKSLIDES_EXPORT    = true;
 window.FUCKSLIDES_CONTENTS  = ${safeJson(slideContents)};
 </script>`;
 
-  html = html.replace('</head>', snippet + '\n</head>');
+  html = html
+    .replace(/<title>[^<]*<\/title>/, `<title>${config.title || config.name || 'Presentation'}</title>`)
+    .replace('</head>', snippet + '\n</head>');
 
   // Inline fuckslides.js and remove external src reference
   if (fsJs) html = html.replace(/<script src="\/js\/fuckslides\.js"><\/script>/g, `<script>${fsJs}<\/script>`);

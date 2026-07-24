@@ -15,7 +15,7 @@
 
 Everything merged on main but unpublished:
 
-- [ ] `npm publish` 0.5.0 (needs Baha's interactive 2FA)
+- [x] `npm publish` 0.5.0 (2026-07-23)
 - Fixed labeled top toolbar (no auto-hide outside fullscreen), instant tooltips with shortcuts, Presenter view removed
 - Selection infrastructure: hover highlight, click select, marquee multi-select, right-click context menu, background-size guard
 - Anchored comments (Google-Slides-style pins), deck-wide comment inbox with navigate-and-open, deck-wide badge
@@ -27,8 +27,8 @@ Everything merged on main but unpublished:
 
 - [x] Buy domain → **fslides.dev** (2026-07-23)
 - [ ] Create GitHub org `fslides`; transfer `bahaaldine/fuckslides` → `fslides/fslides` (GitHub redirects old URLs; npm name already `fslides`)
-- [ ] Create **GitHub App** "fslides" — permissions: `issues: read/write` only, installable per-repo. (GitHub App, not OAuth App: per-repo install, minimal scope, comments post *as the user* via user-to-server tokens.)
-- [ ] DNS plan: `fslides.dev` (site), `api.fslides.dev` (gateway), `decks.fslides.dev` (reserved, later)
+- [x] Create **GitHub App** "fslides" (2026-07-23) — permissions: `issues: read/write` only, installable per-repo. (GitHub App, not OAuth App: per-repo install, minimal scope, comments post *as the user* via user-to-server tokens.)
+- [x] DNS: fslides.dev zone on Cloudflare; `api.fslides.dev` live (worker custom domain); root + decks. reserved
 
 ## Phase 1 — The gateway (`api.fslides.dev`)
 
@@ -38,7 +38,10 @@ The single server-side component. Cloudflare Workers (stateless, ~free, global).
 - [x] No proxy needed: player calls api.github.com directly with the user token (CORS-open) — worker stays stateless and tiny
 - [x] Player: "Sign in with GitHub" replaces the PAT prompt (PAT stays as fallback); tokens expire and self-evict
 - [x] Config: `gateway:` plumbed through serve/build/scaffold (scaffold defaults to api.fslides.dev)
-- [ ] **Deploy**: create GitHub App (settings in `packages/gateway/README.md`), point fslides.dev DNS at Cloudflare, `wrangler deploy` + secrets — needs Baha's browser for both
+- [x] **Deployed** (2026-07-23): GitHub App created, fslides.dev on Cloudflare (autumn/darwin NS), worker live at api.fslides.dev with secrets — healthz ok, OAuth redirect verified
+- [x] Live proof: bahaaldine.github.io/test-deck runs 0.5.0 with gateway + repo wired
+- [ ] Install the fslides GitHub App on deck repos (github.com/apps/fslides → Install) — required for user tokens to write issues
+- [ ] Private-repo decks (elastic/observability-team): needs the app installed on the elastic org (org-owner approval) — park until needed
 - Result: decks on plain GitHub Pages get full interactive commenting with zero deck-side infrastructure
 
 ## Phase 2 — fslides.dev front door
@@ -80,6 +83,7 @@ Candidates, unvalidated:
 - Countdown (3-2-1) option before recording starts
 
 **Housekeeping**
+- scaffold: set repo-local git identity when global config is missing (new machines fail the initial commit)
 - README/USAGE refresh once 0.5.0 ships (new toolbar, comments, build/scaffold)
 - Note for contributors: `git-lfs` required to fetch narration in cloned decks
 - npm publish requires interactive 2FA; local installs of fresh versions need `--min-release-age=0` (global 7-day cooldown is intentional)

@@ -2126,6 +2126,11 @@ let selection = [];          // [{el, sel, rect}]
 let hoverHl = null, marqueeEl = null, ctxMenuEl = null;
 let dragStart = null, dragging = false;
 
+const SLIDE_AREA = 1280 * 720;
+function isBackgroundSized(rect) {
+  // anything covering ~4/5 of the slide is layout, not content
+  return rect.width * rect.height >= SLIDE_AREA * 0.78;
+}
 function blockOf(el, doc) {
   // climb inline elements to the nearest block — "the invisible div"
   let cur = el;
@@ -2134,7 +2139,9 @@ function blockOf(el, doc) {
     if (d !== 'inline' && d !== 'inline-block') break;
     cur = cur.parentElement;
   }
-  return cur && cur !== doc.body && cur !== doc.documentElement ? cur : null;
+  if (!cur || cur === doc.body || cur === doc.documentElement) return null;
+  if (isBackgroundSized(cur.getBoundingClientRect())) return null;
+  return cur;
 }
 function slideRect(el) {
   const r = el.getBoundingClientRect();
@@ -2189,16 +2196,34 @@ function commentOnSelection() {
   box._pendingAnchor = anchor;
 }
 
+function commentOnSlideGeneral(x, y) {
+  closeCtxMenu();
+  const existing = slideThreads.file === slides[idx]
+    ? slideThreads.threads.find(t => !t.anchor) : null;
+  if (existing) { openThread(existing, [x, y, 0, 0]); return; }
+  const box = openThread(null, [x, y, 0, 0]);
+  box._pendingAnchor = null;
+}
+
 function openCtxMenu(x, y) {
   closeCtxMenu();
   const items = [];
   const n = selection.length;
-  items.push({
-    icon: '💬',
-    label: n > 1 ? 'Comment on ' + n + ' elements' : 'Comment',
-    hint: 'K',
-    action: commentOnSelection,
-  });
+  if (n) {
+    items.push({
+      icon: '💬',
+      label: n > 1 ? 'Comment on ' + n + ' elements' : 'Comment',
+      hint: 'K',
+      action: commentOnSelection,
+    });
+  } else {
+    items.push({
+      icon: '💬',
+      label: 'Comment on slide',
+      hint: '',
+      action: () => commentOnSlideGeneral(x, y),
+    });
+  }
   // future actions slot in here
   const menu = document.createElement('div');
   menu.className = 'fs-ctx-menu';
@@ -2272,6 +2297,7 @@ function attachSlideInteractions() {
       for (const el of doc.body.querySelectorAll('*')) {
         const r = el.getBoundingClientRect();
         if (r.width < 8 || r.height < 8) continue;
+        if (isBackgroundSized(r)) continue;
         if (r.left >= mx && r.top >= my && r.right <= mx + mw && r.bottom <= my + mh) inside.push(el);
       }
       const outermost = inside.filter(el => !inside.some(o => o !== el && o.contains(el)));
@@ -2298,8 +2324,9 @@ function attachSlideInteractions() {
     if (block && !selection.some(it => it.el === block)) {
       selection = [{ el: block, sel: cssPath(block, doc), rect: slideRect(block), snippet: snippetOf(block) }];
       renderSelection();
+    } else if (!block) {
+      clearSelection();
     }
-    if (!selection.length) return;
     openCtxMenu(e.clientX + 4, e.clientY + 4);
   }, true);
 }

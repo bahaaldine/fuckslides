@@ -82,6 +82,9 @@ Candidates, unvalidated:
 - Safari records mp4; Chrome webm — consider optional transcode for maximum compat
 - Countdown (3-2-1) option before recording starts
 
+**Scaffold**
+- Auto-wire commenting on scaffold via GitHub App device flow: first run prints a one-time code (enable "Device Flow" on the app), token cached in ~/.config/fslides, then `PUT /user/installations/{id}/repositories/{repo_id}` adds each new repo to a selective installation automatically. (gh CLI tokens can't touch installation APIs — 403, verified 2026-07-24.) Not needed for "All repositories" installs, which remain the recommended default.
+
 **Housekeeping**
 - scaffold: set repo-local git identity when global config is missing (new machines fail the initial commit)
 - README/USAGE refresh once 0.5.0 ships (new toolbar, comments, build/scaffold)

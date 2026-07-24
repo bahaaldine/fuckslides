@@ -66,15 +66,25 @@ export default {
       return new Response('ok', { status: 200 });
     }
 
-    if (url.pathname === '/auth/login') {
+    if (url.pathname === '/auth/login' || url.pathname === '/auth/install') {
       const origin = url.searchParams.get('origin') || '';
       if (!originAllowed(origin, env)) {
         return new Response('Origin not allowed', { status: 400 });
       }
       const state = await signState({ origin, exp: Date.now() + 10 * 60 * 1000 }, env.GITHUB_CLIENT_SECRET);
-      const gh = new URL('https://github.com/login/oauth/authorize');
-      gh.searchParams.set('client_id', env.GITHUB_CLIENT_ID);
-      gh.searchParams.set('state', state);
+      let gh;
+      if (url.pathname === '/auth/install') {
+        // Installation flow doubles as sign-up: the user installs the app
+        // (choosing repos or "all"), and because the app requests OAuth
+        // during installation, GitHub authorizes them in the same flow and
+        // returns to our callback with a code — install + sign-in in one.
+        gh = new URL('https://github.com/apps/' + (env.APP_SLUG || 'fslides') + '/installations/new');
+        gh.searchParams.set('state', state);
+      } else {
+        gh = new URL('https://github.com/login/oauth/authorize');
+        gh.searchParams.set('client_id', env.GITHUB_CLIENT_ID);
+        gh.searchParams.set('state', state);
+      }
       return Response.redirect(gh.toString(), 302);
     }
 

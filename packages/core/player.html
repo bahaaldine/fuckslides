@@ -1876,12 +1876,16 @@ const ghToken = () => {
 };
 
 // ── Sign in with GitHub (via the fslides gateway) ──
-function signInWithGitHub() {
+// install=true routes through the GitHub App installation flow, which also
+// authorizes the user (OAuth-during-install) — sign-up and repo enablement
+// in a single popup. Used for first-time users and app-not-installed errors.
+function signInWithGitHub(install) {
   if (!GATEWAY) return;
-  const w = 640, h = 760;
+  const w = 640, h = 780;
   const x = (screen.width - w) / 2, y = (screen.height - h) / 2;
+  const path = install ? '/auth/install' : '/auth/login';
   window.open(
-    GATEWAY.replace(/\/$/, '') + '/auth/login?origin=' + encodeURIComponent(location.origin),
+    GATEWAY.replace(/\/$/, '') + path + '?origin=' + encodeURIComponent(location.origin),
     'fslides-auth',
     `width=${w},height=${h},left=${x},top=${y}`);
 }
@@ -2196,7 +2200,11 @@ function openThread(thread, rect) {
         status.textContent = 'finish posting in the GitHub tab, then reopen';
       }
     } catch (e) {
-      if (/403|404/.test(e.message) && REPO) {
+      if (/403|404/.test(e.message) && REPO && GATEWAY) {
+        status.innerHTML = 'The fslides app isn\u2019t enabled on this repo \u2014 <a href="#" id="th-install">enable it</a> (one popup), then Post again.';
+        const inst = status.querySelector('#th-install');
+        if (inst) inst.addEventListener('click', ev => { ev.preventDefault(); signInWithGitHub(true); });
+      } else if (/403|404/.test(e.message) && REPO) {
         status.innerHTML = 'The fslides app isn\u2019t installed on this repo \u2014 <a href="https://github.com/apps/fslides/installations/new" target="_blank" rel="noopener">install it</a> (once), then Post again.';
       } else {
         status.textContent = 'failed: ' + e.message;
@@ -2205,7 +2213,7 @@ function openThread(thread, rect) {
     }
   });
   const signin = status.querySelector('#th-signin');
-  if (signin) signin.addEventListener('click', e => { e.preventDefault(); signInWithGitHub(); });
+  if (signin) signin.addEventListener('click', e => { e.preventDefault(); signInWithGitHub(true); });
   const tok = status.querySelector('#th-token');
   if (tok) tok.addEventListener('click', e => {
     e.preventDefault();

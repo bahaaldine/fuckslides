@@ -3276,19 +3276,11 @@ function broadcastPresenterState() {
 }
 
 // ── Toolbar visibility ────────────────────────────────────────────────────────
-// Fixed and always visible — except while presenting fullscreen, where it
-// hides after a moment and reappears on mouse movement.
-let navHideTimer = null;
+// Fixed and always visible — hidden entirely while presenting fullscreen
+// (keyboard drives navigation; Esc exits and brings it back).
 function showNavBar() {
-  presoNav.classList.remove('nav-hidden');
-  clearTimeout(navHideTimer);
-  if (document.fullscreenElement) {
-    navHideTimer = setTimeout(() => presoNav.classList.add('nav-hidden'), 2200);
-  }
+  presoNav.classList.toggle('nav-hidden', !!document.fullscreenElement);
 }
-document.addEventListener('mousemove', showNavBar);
-presoNav.addEventListener('mouseenter', () => clearTimeout(navHideTimer));
-presoNav.addEventListener('mouseleave', showNavBar);
 document.addEventListener('fullscreenchange', showNavBar);
 document.addEventListener('fullscreenchange', () => {
   const presenting = !!document.fullscreenElement;

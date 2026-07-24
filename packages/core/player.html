@@ -2196,7 +2196,11 @@ function openThread(thread, rect) {
         status.textContent = 'finish posting in the GitHub tab, then reopen';
       }
     } catch (e) {
-      status.textContent = 'failed: ' + e.message;
+      if (/403|404/.test(e.message) && REPO) {
+        status.innerHTML = 'The fslides app isn\u2019t installed on this repo \u2014 <a href="https://github.com/apps/fslides/installations/new" target="_blank" rel="noopener">install it</a> (once), then Post again.';
+      } else {
+        status.textContent = 'failed: ' + e.message;
+      }
       post.disabled = false;
     }
   });

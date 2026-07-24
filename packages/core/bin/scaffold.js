@@ -190,6 +190,9 @@ Send a PR when you're happy.
      Pages:    https://${owner}.github.io/${name}/   (first deploy running now)
      Comments: press K in the player → issues on the repo
 
+     One-time (skip if the fslides app is installed with "All repositories"):
+     enable commenting on this repo → https://github.com/apps/fslides/installations/new
+
      cd ${name} && npm install && npm run serve
 `);
 };

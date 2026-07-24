@@ -282,6 +282,7 @@
 
     /* ── Anchored comments ── */
     #anchor-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+    body.presenting #anchor-layer { display: none; }   /* clean canvas while presenting */
     .hover-highlight {
       position: absolute; pointer-events: none;
       border: 1.5px dashed rgba(56,189,248,0.55); border-radius: 4px;
@@ -3289,6 +3290,13 @@ document.addEventListener('mousemove', showNavBar);
 presoNav.addEventListener('mouseenter', () => clearTimeout(navHideTimer));
 presoNav.addEventListener('mouseleave', showNavBar);
 document.addEventListener('fullscreenchange', showNavBar);
+document.addEventListener('fullscreenchange', () => {
+  const presenting = !!document.fullscreenElement;
+  document.body.classList.toggle('presenting', presenting);
+  if (presenting) {
+    try { closeCtxMenu(); closeThread(); clearSelection(); clearHover(); } catch (_) {}
+  }
+});
 showNavBar();
 
 // ── Config hot-reload ─────────────────────────────────────────────────────────

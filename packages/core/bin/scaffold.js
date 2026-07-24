@@ -82,6 +82,20 @@ module.exports = function scaffold(name, opts = {}) {
 
   fs.writeFileSync(path.join(dir, '.gitignore'), 'node_modules/\n_site/\n.DS_Store\n', 'utf8');
 
+  // Git LFS for narration recordings, when available — re-recorded takes go
+  // to LFS storage instead of accumulating in every clone's history
+  let hasLfs = false;
+  try { sh('git lfs version'); hasLfs = true; } catch (_) {}
+  if (hasLfs) {
+    fs.writeFileSync(path.join(dir, '.gitattributes'),
+`# Narration recordings — Git LFS keeps re-recorded takes out of clone history
+slides/recordings/*.webm filter=lfs diff=lfs merge=lfs -text
+slides/recordings/*.m4a  filter=lfs diff=lfs merge=lfs -text
+slides/recordings/*.mp4  filter=lfs diff=lfs merge=lfs -text
+slides/recordings/*.mp3  filter=lfs diff=lfs merge=lfs -text
+`, 'utf8');
+  }
+
   fs.mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true });
   fs.writeFileSync(path.join(dir, '.github', 'workflows', 'pages.yml'), `name: Deploy deck to GitHub Pages
 
@@ -107,6 +121,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -148,6 +164,7 @@ Send a PR when you're happy.
   const vis = opts.private ? '--private' : '--public';
   try {
     sh('git init -b main', { cwd: dir });
+    if (hasLfs) { try { sh('git lfs install --local', { cwd: dir }); } catch (_) {} }
     sh('git add -A', { cwd: dir });
     sh('git commit -m "scaffold: new fslides deck"', { cwd: dir });
     console.log(`  Creating GitHub repo (${opts.private ? 'private' : 'public'})…`);

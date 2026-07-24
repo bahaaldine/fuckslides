@@ -282,13 +282,45 @@
 
     /* ── Anchored comments ── */
     #anchor-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
-    .pick-highlight {
+    .hover-highlight {
       position: absolute; pointer-events: none;
-      border: 2px solid #38BDF8; border-radius: 4px;
-      background: rgba(56,189,248,0.08);
-      box-shadow: 0 0 0 4000px rgba(0,0,0,0.12);
-      transition: all 0.06s ease;
+      border: 1.5px dashed rgba(56,189,248,0.55); border-radius: 4px;
+      background: rgba(56,189,248,0.04);
+      transition: all 0.05s ease;
     }
+    .sel-box {
+      position: absolute; pointer-events: none;
+      border: 2px solid #38BDF8; border-radius: 3px;
+      background: rgba(56,189,248,0.07);
+    }
+    .sel-box::after, .sel-box::before {
+      content: ''; position: absolute; width: 8px; height: 8px;
+      background: #38BDF8; border-radius: 2px;
+    }
+    .sel-box::before { top: -5px; left: -5px; }
+    .sel-box::after  { bottom: -5px; right: -5px; }
+    .marquee {
+      position: absolute; pointer-events: none;
+      border: 1.5px solid rgba(56,189,248,0.8);
+      background: rgba(56,189,248,0.12); border-radius: 2px;
+    }
+    .fs-ctx-menu {
+      position: absolute; min-width: 230px; z-index: 30;
+      background: rgba(16,18,24,0.98); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.14); border-radius: 10px;
+      box-shadow: 0 14px 44px rgba(0,0,0,0.55);
+      padding: 6px; pointer-events: auto;
+      font-family: 'Inter', -apple-system, sans-serif;
+    }
+    .fs-ctx-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 7px; cursor: pointer;
+      font-size: 0.85rem; font-weight: 500; color: rgba(255,255,255,0.82);
+      white-space: nowrap;
+    }
+    .fs-ctx-item:hover { background: rgba(56,189,248,0.15); color: #fff; }
+    .fs-ctx-label { flex: 1; }
+    .fs-ctx-hint { font-size: 0.68rem; color: rgba(255,255,255,0.3); }
     .comment-pin {
       position: absolute; width: 34px; height: 34px; border-radius: 50% 50% 50% 6px;
       background: #38BDF8; color: #0d0f14;
@@ -335,7 +367,6 @@
     .thread-btn.ghost { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.6); }
     .thread-status { padding: 0 18px 10px; font-size: 0.7rem; color: rgba(255,255,255,0.35); }
     .thread-status a { color: #38BDF8; text-decoration: none; }
-    body.commenting #slide-frame { cursor: crosshair; }
 
     /* ── Comments (GitHub issues) ── */
     #comments-panel {
@@ -676,7 +707,7 @@
   <div class="comments-header">
     <span>Comments</span>
     <span class="comments-slide-name" id="comments-slide-name"></span>
-    <button class="comments-add" id="comments-pick">+ Comment — click anything on the slide</button>
+    <button class="comments-add" id="comments-pick">+ Comment on selection</button>
     <a class="comments-add" id="comments-gh-link" target="_blank" rel="noopener" style="background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.15); color:rgba(255,255,255,0.55)">Open on GitHub ↗</a>
   </div>
   <div id="comments-list"></div>
@@ -724,7 +755,7 @@
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="10" rx="1.5"/><path d="M5 6h6M5 8.5h4"/></svg>
     <span class="nav-label">Notes</span>
   </button>
-  <button class="nav-btn" id="btn-comments" data-tip="Slide comments on GitHub — K" style="display:none; position:relative;">
+  <button class="nav-btn" id="btn-comments" data-tip="Comments — K · or right-click anything on the slide" style="display:none; position:relative;">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 10a1.5 1.5 0 0 1-1.5 1.5H6l-3.5 3v-3H3.5A1.5 1.5 0 0 1 2 10V3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5V10z"/></svg>
     <span class="nav-label">Comments</span>
     <span class="comment-count" id="comment-count" style="display:none"></span>
@@ -1328,8 +1359,9 @@ function handleKey(key) {
   if (key === 'Escape') {
     if (laserMode) { deactivateLaser(); return; }
     if (drawMode)  { deactivateDraw();  return; }
-    if (pickMode) { exitPickMode(); return; }
+    if (ctxMenuEl) { closeCtxMenu(); return; }
     if (openThreadEl) { closeThread(); return; }
+    if (selection.length) { clearSelection(); return; }
     if (voiceOpen) { closeVoicePanel(); return; }
     if (commentsOpen) { closeComments(); return; }
     if (ovOpen) { closeOverview(); return; } if (fsOpen) { closeFilmstrip(); return; }
@@ -1818,7 +1850,6 @@ const commentCountEl   = document.getElementById('comment-count');
 const anchorLayer      = document.getElementById('anchor-layer');
 
 let commentsOpen = false;
-let pickMode     = false;
 let openThreadEl = null;
 let slideThreads = { file: null, issue: null, threads: [] };
 let serveComments = false;    // /api/comments reachable → gh-backed transport
@@ -1852,12 +1883,20 @@ function snippetOf(el) {
 function resolveAnchorRect(anchor) {
   try {
     const doc = frame.contentDocument;
-    if (doc && anchor.sel) {
-      const el = doc.querySelector(anchor.sel);
-      if (el) {
+    const sels = anchor.sels || (anchor.sel ? [anchor.sel] : []);
+    if (doc && sels.length) {
+      let u = null;
+      for (const sel of sels) {
+        const el = doc.querySelector(sel);
+        if (!el) continue;
         const r = el.getBoundingClientRect();
-        if (r.width || r.height) return [r.left, r.top, r.width, r.height];
+        if (!r.width && !r.height) continue;
+        u = u ? [Math.min(u[0], r.left), Math.min(u[1], r.top),
+                 Math.max(u[0] + u[2], r.right) - Math.min(u[0], r.left),
+                 Math.max(u[1] + u[3], r.bottom) - Math.min(u[1], r.top)] 
+              : [r.left, r.top, r.width, r.height];
       }
+      if (u) return u;
     }
   } catch (_) {}
   return anchor.rect || null;   // snapshot fallback when the DOM changed
@@ -1932,7 +1971,7 @@ async function loadComments() {
   const byKey = {};
   for (const c of data.comments || []) {
     const anchor = parseAnchor(c.body);
-    const key = anchor && anchor.sel ? anchor.sel : '__general__';
+    const key = anchor ? (anchor.sels ? anchor.sels.join('|') : anchor.sel) || '__general__' : '__general__';
     if (!byKey[key]) {
       byKey[key] = { key, anchor: anchor || null, comments: [] };
       threads.push(byKey[key]);
@@ -2078,59 +2117,191 @@ function openThread(thread, rect) {
   return box;
 }
 
-// ── pick mode ──
-let pickHl = null;
-function enterPickMode() {
-  if (pickMode) return;
-  pickMode = true;
-  document.body.classList.add('commenting');
-  commentsPickBtn.textContent = 'Click an element… (Esc to cancel)';
-  try {
-    const doc = frame.contentDocument;
-    doc.addEventListener('mousemove', pickMove, true);
-    doc.addEventListener('click', pickClick, true);
-  } catch (_) { exitPickMode(); }
-}
-function exitPickMode() {
-  pickMode = false;
-  document.body.classList.remove('commenting');
-  commentsPickBtn.textContent = '+ Comment — click anything on the slide';
-  if (pickHl) { pickHl.remove(); pickHl = null; }
-  try {
-    const doc = frame.contentDocument;
-    doc.removeEventListener('mousemove', pickMove, true);
-    doc.removeEventListener('click', pickClick, true);
-  } catch (_) {}
-}
-function pickMove(e) {
-  const el = e.target;
-  if (!el || el === frame.contentDocument.body || el === frame.contentDocument.documentElement) {
-    if (pickHl) pickHl.style.display = 'none';
-    return;
+// ── Selection infrastructure ─────────────────────────────────────────────────
+// Hovering highlights the block under the cursor; click selects it; drag
+// draws a marquee that selects every block inside it; right-click opens the
+// fslides context menu (Comment today, more actions later). All of it maps
+// straight onto slide coordinates via the anchor layer.
+let selection = [];          // [{el, sel, rect}]
+let hoverHl = null, marqueeEl = null, ctxMenuEl = null;
+let dragStart = null, dragging = false;
+
+function blockOf(el, doc) {
+  // climb inline elements to the nearest block — "the invisible div"
+  let cur = el;
+  while (cur && cur !== doc.body) {
+    const d = (doc.defaultView || window).getComputedStyle(cur).display;
+    if (d !== 'inline' && d !== 'inline-block') break;
+    cur = cur.parentElement;
   }
-  const r = el.getBoundingClientRect();
-  if (!pickHl) { pickHl = document.createElement('div'); pickHl.className = 'pick-highlight'; anchorLayer.appendChild(pickHl); }
-  pickHl.style.display = 'block';
-  pickHl.style.left = r.left + 'px';
-  pickHl.style.top = r.top + 'px';
-  pickHl.style.width = r.width + 'px';
-  pickHl.style.height = r.height + 'px';
+  return cur && cur !== doc.body && cur !== doc.documentElement ? cur : null;
 }
-function pickClick(e) {
-  e.preventDefault(); e.stopPropagation();
-  const el = e.target;
-  const doc = frame.contentDocument;
-  if (!el || el === doc.body || el === doc.documentElement) return;
+function slideRect(el) {
   const r = el.getBoundingClientRect();
-  const anchor = {
-    v: 1,
-    sel: cssPath(el, doc),
-    rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
-    snippet: snippetOf(el),
-  };
-  exitPickMode();
+  return [r.left, r.top, r.width, r.height];
+}
+
+function clearHover() { if (hoverHl) { hoverHl.style.display = 'none'; } }
+function clearSelection() {
+  selection = [];
+  anchorLayer.querySelectorAll('.sel-box').forEach(e => e.remove());
+}
+function renderSelection() {
+  anchorLayer.querySelectorAll('.sel-box').forEach(e => e.remove());
+  for (const it of selection) {
+    const box = document.createElement('div');
+    box.className = 'sel-box';
+    const r = it.rect;
+    box.style.left = r[0] + 'px'; box.style.top = r[1] + 'px';
+    box.style.width = r[2] + 'px'; box.style.height = r[3] + 'px';
+    anchorLayer.appendChild(box);
+  }
+}
+function closeCtxMenu() { if (ctxMenuEl) { ctxMenuEl.remove(); ctxMenuEl = null; } }
+
+function selectionAnchor() {
+  if (!selection.length) return null;
+  if (selection.length === 1) {
+    const it = selection[0];
+    return { v: 1, sel: it.sel, rect: it.rect.map(Math.round), snippet: it.snippet };
+  }
+  let u = selection[0].rect.slice();
+  for (const it of selection.slice(1)) {
+    const r = it.rect;
+    const x = Math.min(u[0], r[0]), y = Math.min(u[1], r[1]);
+    u = [x, y, Math.max(u[0] + u[2], r[0] + r[2]) - x, Math.max(u[1] + u[3], r[1] + r[3]) - y];
+  }
+  return { v: 2, sels: selection.map(it => it.sel), rect: u.map(Math.round),
+           snippet: selection.length + ' elements' };
+}
+
+function commentOnSelection() {
+  const anchor = selectionAnchor();
+  if (!anchor) return;
+  closeCtxMenu();
+  // exact-match existing thread → open it
+  const key = anchor.sels ? anchor.sels.join('|') : anchor.sel;
+  const existing = slideThreads.file === slides[idx]
+    ? slideThreads.threads.find(t => t.anchor && ((t.anchor.sels ? t.anchor.sels.join('|') : t.anchor.sel) === key))
+    : null;
+  if (existing) { openThread(existing, resolveAnchorRect(existing.anchor)); return; }
   const box = openThread(null, anchor.rect);
   box._pendingAnchor = anchor;
+}
+
+function openCtxMenu(x, y) {
+  closeCtxMenu();
+  const items = [];
+  const n = selection.length;
+  items.push({
+    icon: '💬',
+    label: n > 1 ? 'Comment on ' + n + ' elements' : 'Comment',
+    hint: 'K',
+    action: commentOnSelection,
+  });
+  // future actions slot in here
+  const menu = document.createElement('div');
+  menu.className = 'fs-ctx-menu';
+  for (const it of items) {
+    const row = document.createElement('div');
+    row.className = 'fs-ctx-item';
+    row.innerHTML = '<span></span><span class="fs-ctx-label"></span><span class="fs-ctx-hint"></span>';
+    row.children[0].textContent = it.icon;
+    row.children[1].textContent = it.label;
+    row.children[2].textContent = it.hint || '';
+    row.addEventListener('click', it.action);
+    menu.appendChild(row);
+  }
+  menu.style.left = Math.min(x, 1280 - 245) + 'px';
+  menu.style.top  = Math.min(y, 720 - 60 * items.length) + 'px';
+  anchorLayer.appendChild(menu);
+  ctxMenuEl = menu;
+}
+
+function attachSlideInteractions() {
+  let doc;
+  try { doc = frame.contentDocument; } catch (_) { return; }
+  if (!doc || doc._fsSelAttached) return;
+  doc._fsSelAttached = true;
+
+  doc.addEventListener('mousemove', e => {
+    if (document.fullscreenElement) { clearHover(); return; }
+    if (dragStart) {
+      const dx = e.clientX - dragStart[0], dy = e.clientY - dragStart[1];
+      if (!dragging && Math.abs(dx) + Math.abs(dy) > 7) {
+        dragging = true;
+        marqueeEl = document.createElement('div');
+        marqueeEl.className = 'marquee';
+        anchorLayer.appendChild(marqueeEl);
+      }
+      if (dragging) {
+        e.preventDefault();
+        const x = Math.min(dragStart[0], e.clientX), y = Math.min(dragStart[1], e.clientY);
+        marqueeEl.style.left = x + 'px'; marqueeEl.style.top = y + 'px';
+        marqueeEl.style.width = Math.abs(dx) + 'px'; marqueeEl.style.height = Math.abs(dy) + 'px';
+        clearHover();
+        return;
+      }
+    }
+    const block = blockOf(e.target, doc);
+    if (!block) { clearHover(); return; }
+    const r = block.getBoundingClientRect();
+    if (!hoverHl) { hoverHl = document.createElement('div'); hoverHl.className = 'hover-highlight'; anchorLayer.appendChild(hoverHl); }
+    hoverHl.style.display = 'block';
+    hoverHl.style.left = r.left + 'px'; hoverHl.style.top = r.top + 'px';
+    hoverHl.style.width = r.width + 'px'; hoverHl.style.height = r.height + 'px';
+  }, true);
+
+  doc.addEventListener('mouseleave', clearHover, true);
+
+  doc.addEventListener('mousedown', e => {
+    if (e.button !== 0 || document.fullscreenElement) return;
+    closeCtxMenu();
+    dragStart = [e.clientX, e.clientY];
+    dragging = false;
+  }, true);
+
+  doc.addEventListener('mouseup', e => {
+    if (e.button !== 0) return;
+    if (dragging && marqueeEl) {
+      // marquee select: every block fully inside, outermost only
+      const mx = parseFloat(marqueeEl.style.left), my = parseFloat(marqueeEl.style.top);
+      const mw = parseFloat(marqueeEl.style.width), mh = parseFloat(marqueeEl.style.height);
+      marqueeEl.remove(); marqueeEl = null;
+      const inside = [];
+      for (const el of doc.body.querySelectorAll('*')) {
+        const r = el.getBoundingClientRect();
+        if (r.width < 8 || r.height < 8) continue;
+        if (r.left >= mx && r.top >= my && r.right <= mx + mw && r.bottom <= my + mh) inside.push(el);
+      }
+      const outermost = inside.filter(el => !inside.some(o => o !== el && o.contains(el)));
+      selection = outermost.map(el => ({ el, sel: cssPath(el, doc), rect: slideRect(el), snippet: snippetOf(el) }));
+      renderSelection();
+    } else if (dragStart && !dragging) {
+      // plain click: select the block (slide interactivity untouched)
+      const block = blockOf(e.target, doc);
+      if (block) {
+        selection = [{ el: block, sel: cssPath(block, doc), rect: slideRect(block), snippet: snippetOf(block) }];
+      } else {
+        selection = [];
+      }
+      renderSelection();
+    }
+    dragStart = null; dragging = false;
+  }, true);
+
+  doc.addEventListener('contextmenu', e => {
+    if (document.fullscreenElement) return;
+    const block = blockOf(e.target, doc);
+    e.preventDefault();
+    // right-click outside the current selection re-selects the target block
+    if (block && !selection.some(it => it.el === block)) {
+      selection = [{ el: block, sel: cssPath(block, doc), rect: slideRect(block), snippet: snippetOf(block) }];
+      renderSelection();
+    }
+    if (!selection.length) return;
+    openCtxMenu(e.clientX + 4, e.clientY + 4);
+  }, true);
 }
 
 // ── panel (thread list) ──
@@ -2143,7 +2314,7 @@ function renderPanel() {
   if (!slideThreads.threads.length) {
     const d = document.createElement('div');
     d.className = 'comments-empty';
-    d.textContent = 'No comments on this slide yet — click "+ Comment" and pick any element.';
+    d.textContent = 'No comments yet — right-click anything on the slide to comment on it.';
     commentsListEl.appendChild(d);
     return;
   }
@@ -2175,6 +2346,7 @@ function renderPanel() {
 
 async function refreshComments() {
   if (!REPO) return;
+  attachSlideInteractions();
   try {
     await loadComments();
   } catch (_) {
@@ -2203,14 +2375,24 @@ function toggleComments() { commentsOpen ? closeComments() : openComments(); }
 function commentsOnSlideChange() {
   if (!REPO) return;
   clearPins();
+  clearSelection();
+  closeCtxMenu();
+  clearHover();
+  hoverHl = null;   // belonged to the previous slide's layer state
   updateCommentBadge();
 }
 
 if (REPO) {
   btnComments.style.display = '';
   btnComments.addEventListener('click', toggleComments);
-  commentsPickBtn.addEventListener('click', () => { pickMode ? exitPickMode() : enterPickMode(); });
-  frame.addEventListener('load', () => { setTimeout(refreshComments, 400); });
+  commentsPickBtn.addEventListener('click', () => {
+    if (selection.length) commentOnSelection();
+    else commentsPickBtn.textContent = 'Select or right-click an element on the slide first';
+  });
+  frame.addEventListener('load', () => {
+    attachSlideInteractions();                 // selection live immediately
+    setTimeout(refreshComments, 400);          // pins after slide scripts settle
+  });
 }
 
 // ── Voice-over / video narration ─────────────────────────────────────────────

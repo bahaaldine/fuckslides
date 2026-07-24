@@ -123,6 +123,8 @@ window.FUCKSLIDES_REPO      = ${JSON.stringify(repo)};
   watchPath(slidesDir, true);
   watchPath(cfgPath, false);
 
+  const allCommentsCache = { data: null, at: 0 };
+
   const server = http.createServer((req, res) => {
     let urlPath = req.url.split('?')[0];
 
@@ -242,6 +244,44 @@ window.FUCKSLIDES_REPO      = ${JSON.stringify(repo)};
       return;
     }
 
+    // ── All comments across the deck (panel inbox) ──
+    if (req.method === 'GET' && urlPath === '/api/all-comments') {
+      if (!repo) { res.writeHead(501); res.end('{}'); return; }
+      if (allCommentsCache.data && Date.now() - allCommentsCache.at < 20000) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(allCommentsCache.data);
+        return;
+      }
+      try {
+        const listJson = execSync(
+          `gh issue list --repo ${repo} --state open --search ${JSON.stringify('in:title "\ud83d\udcac Slide:"')} --json number,title,body,author,createdAt,url --limit 100`,
+          { encoding: 'utf8', stdio: 'pipe' });
+        const issues = JSON.parse(listJson).filter(i => i.title.startsWith('\ud83d\udcac Slide: '));
+        const bySlide = {};
+        for (const issue of issues) {
+          const file = issue.title.slice('\ud83d\udcac Slide: '.length).trim();
+          let comments = [];
+          if (issue.body && issue.body.trim()) {
+            comments.push({ user: { login: issue.author.login }, body: issue.body, created_at: issue.createdAt, html_url: issue.url });
+          }
+          try {
+            const cJson = execSync(`gh api repos/${repo}/issues/${issue.number}/comments --paginate`, { encoding: 'utf8', stdio: 'pipe' });
+            comments = comments.concat(JSON.parse(cJson));
+          } catch (_) {}
+          bySlide[file] = { issue: { number: issue.number, html_url: issue.url }, comments };
+        }
+        const payload = JSON.stringify({ bySlide });
+        allCommentsCache.data = payload;
+        allCommentsCache.at = Date.now();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(payload);
+      } catch (e) {
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: String(e.message).split('\n')[0] }));
+      }
+      return;
+    }
+
     // ── Comments (gh CLI-backed: works for private repos with local auth) ──
     if (req.method === 'GET' && urlPath === '/api/comments') {
       const file = new URL(req.url, 'http://localhost').searchParams.get('file');
@@ -290,6 +330,7 @@ window.FUCKSLIDES_REPO      = ${JSON.stringify(repo)};
             execSync(`gh issue create --repo ${repo} --title ${JSON.stringify(title)} --body-file ${JSON.stringify(tmp)}`, { encoding: 'utf8', stdio: 'pipe' });
           }
           fs.unlinkSync(tmp);
+          allCommentsCache.data = null;   // new comment → panel refetch
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true }));
         } catch (e) {

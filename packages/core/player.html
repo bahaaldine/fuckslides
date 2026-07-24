@@ -406,6 +406,14 @@
     .comment-meta strong { color: rgba(255,255,255,0.75); font-weight: 600; }
     .comment-text { font-size: 0.78rem; line-height: 1.55; color: rgba(255,255,255,0.7); font-family: 'Inter', -apple-system, sans-serif; white-space: pre-wrap; word-break: break-word; }
     .comments-empty { padding: 24px 0; text-align: center; font-size: 0.72rem; color: rgba(255,255,255,0.25); font-style: italic; font-family: 'Inter', -apple-system, sans-serif; }
+    .comments-slide-head {
+      margin: 12px 0 2px; padding: 5px 8px; border-radius: 6px;
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+      color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.04); cursor: pointer;
+    }
+    .comments-slide-head:hover { color: rgba(255,255,255,0.7); }
+    .comments-slide-head.current { color: #38BDF8; background: rgba(56,189,248,0.08); cursor: default; }
     .comments-empty a { color: #38BDF8; text-decoration: none; }
     .nav-btn .comment-count {
       position: absolute; top: -3px; right: -3px;
@@ -1963,13 +1971,10 @@ async function postComment(file, text) {
   return false;
 }
 
-// ── data → threads ──
-async function loadComments() {
-  const file = slides[idx];
-  const data = await fetchComments(file);
+function threadsFrom(comments) {
   const threads = [];
   const byKey = {};
-  for (const c of data.comments || []) {
+  for (const c of comments || []) {
     const anchor = parseAnchor(c.body);
     const key = anchor ? (anchor.sels ? anchor.sels.join('|') : anchor.sel) || '__general__' : '__general__';
     if (!byKey[key]) {
@@ -1979,7 +1984,51 @@ async function loadComments() {
     if (anchor && !byKey[key].anchor) byKey[key].anchor = anchor;
     byKey[key].comments.push({ user: c.user, created_at: c.created_at, text: stripAnchor(c.body) });
   }
-  slideThreads = { file, issue: data.issue, threads };
+  return threads;
+}
+
+// deck-wide inbox: { file: { issue, threads } }
+let deckComments = { at: 0, bySlide: {} };
+async function loadAllComments(force) {
+  if (!force && Date.now() - deckComments.at < 30000) return deckComments;
+  let bySlide = {};
+  if (serveComments) {
+    const r = await fetch('/api/all-comments');
+    if (!r.ok) throw new Error('serve ' + r.status);
+    const data = await r.json();
+    for (const [file, entry] of Object.entries(data.bySlide || {})) {
+      bySlide[file] = { issue: entry.issue, threads: threadsFrom(entry.comments) };
+    }
+  } else {
+    const headers = { Accept: 'application/vnd.github+json' };
+    if (ghToken()) headers.Authorization = 'Bearer ' + ghToken();
+    const q = encodeURIComponent(`repo:${REPO} in:title "💬 Slide:"`);
+    const r = await fetch('https://api.github.com/search/issues?q=' + q + '&per_page=100', { headers });
+    if (!r.ok) throw new Error('gh ' + r.status);
+    const data = await r.json();
+    for (const issue of (data.items || [])) {
+      if (!issue.title.startsWith('💬 Slide: ')) continue;
+      const file = issue.title.slice('💬 Slide: '.length).trim();
+      let comments = [];
+      if (issue.body && issue.body.trim()) comments.push({ user: issue.user, body: issue.body, created_at: issue.created_at });
+      if (issue.comments > 0) {
+        try {
+          const cr = await fetch(issue.comments_url + '?per_page=100', { headers });
+          if (cr.ok) comments = comments.concat(await cr.json());
+        } catch (_) {}
+      }
+      bySlide[file] = { issue: { number: issue.number, html_url: issue.html_url }, threads: threadsFrom(comments) };
+    }
+  }
+  deckComments = { at: Date.now(), bySlide };
+  return deckComments;
+}
+
+// ── data → threads ──
+async function loadComments() {
+  const file = slides[idx];
+  const data = await fetchComments(file);
+  slideThreads = { file, issue: data.issue, threads: threadsFrom(data.comments) };
   return slideThreads;
 }
 
@@ -2094,7 +2143,8 @@ function openThread(thread, rect) {
       const posted = await postComment(slides[idx], header + val);
       if (posted) {
         status.textContent = '✓ posted';
-        await refreshComments();
+        deckComments.at = 0;
+        await refreshComments(true);
         closeThread();
       } else {
         status.textContent = 'finish posting in the GitHub tab, then reopen';
@@ -2331,47 +2381,70 @@ function attachSlideInteractions() {
   }, true);
 }
 
-// ── panel (thread list) ──
+// ── panel: deck-wide comment inbox ──
+let pendingThreadKey = null;   // open this thread after navigating
+
+function threadRow(t, file) {
+  const row = document.createElement('div');
+  row.className = 'comment-item';
+  row.style.cursor = 'pointer';
+  const body = document.createElement('div');
+  body.className = 'comment-body';
+  const meta = document.createElement('div');
+  meta.className = 'comment-meta';
+  const who = document.createElement('strong');
+  who.textContent = t.anchor ? '📍 “' + (t.anchor.snippet || 'element') + '”' : '💬 Slide comment';
+  meta.appendChild(who);
+  meta.appendChild(document.createTextNode(' · ' + t.comments.length + ' comment' + (t.comments.length > 1 ? 's' : '')));
+  const text = document.createElement('div');
+  text.className = 'comment-text';
+  const last = t.comments[t.comments.length - 1];
+  text.textContent = ((last.user && last.user.login) || '') + ': ' + last.text.slice(0, 120);
+  body.appendChild(meta); body.appendChild(text);
+  row.appendChild(body);
+  row.addEventListener('click', () => {
+    if (file === slides[idx]) {
+      const rect = t.anchor ? resolveAnchorRect(t.anchor) : null;
+      openThread(t, rect || [400, 200, 0, 0]);
+    } else {
+      pendingThreadKey = t.key;
+      go(slides.indexOf(file));
+    }
+  });
+  return row;
+}
+
 function renderPanel() {
-  commentsSlideEl.textContent = slides[idx];
-  commentsGhLink.href = slideThreads.issue
-    ? slideThreads.issue.html_url
-    : 'https://github.com/' + REPO + '/issues?q=' + encodeURIComponent('in:title "' + slideIssueTitle(slides[idx]) + '"');
+  commentsSlideEl.textContent = 'all slides';
+  commentsGhLink.href = 'https://github.com/' + REPO + '/issues?q=' + encodeURIComponent('in:title "💬 Slide:"');
   commentsListEl.innerHTML = '';
-  if (!slideThreads.threads.length) {
+
+  // current slide first, then deck order
+  const files = Object.keys(deckComments.bySlide)
+    .filter(f => slides.includes(f))
+    .sort((a, b) => (a === slides[idx] ? -1 : b === slides[idx] ? 1 : slides.indexOf(a) - slides.indexOf(b)));
+
+  if (!files.length) {
     const d = document.createElement('div');
     d.className = 'comments-empty';
-    d.textContent = 'No comments yet — right-click anything on the slide to comment on it.';
+    d.textContent = 'No comments in this deck yet — right-click anything on a slide to start.';
     commentsListEl.appendChild(d);
     return;
   }
-  for (const t of slideThreads.threads) {
-    const row = document.createElement('div');
-    row.className = 'comment-item';
-    row.style.cursor = 'pointer';
-    const body = document.createElement('div');
-    body.className = 'comment-body';
-    const meta = document.createElement('div');
-    meta.className = 'comment-meta';
-    const who = document.createElement('strong');
-    who.textContent = t.anchor ? '📍 “' + (t.anchor.snippet || 'element') + '”' : '💬 Slide comment';
-    meta.appendChild(who);
-    meta.appendChild(document.createTextNode(' · ' + t.comments.length + ' comment' + (t.comments.length > 1 ? 's' : '')));
-    const text = document.createElement('div');
-    text.className = 'comment-text';
-    const last = t.comments[t.comments.length - 1];
-    text.textContent = ((last.user && last.user.login) || '') + ': ' + last.text.slice(0, 120);
-    body.appendChild(meta); body.appendChild(text);
-    row.appendChild(body);
-    row.addEventListener('click', () => {
-      const rect = t.anchor ? resolveAnchorRect(t.anchor) : null;
-      openThread(t, rect || [400, 200, 0, 0]);
-    });
-    commentsListEl.appendChild(row);
+  for (const file of files) {
+    const entry = deckComments.bySlide[file];
+    const total = entry.threads.reduce((a, t) => a + t.comments.length, 0);
+    const head = document.createElement('div');
+    head.className = 'comments-slide-head' + (file === slides[idx] ? ' current' : '');
+    const label = labels[slides.indexOf(file)] || file;
+    head.textContent = label + '  ·  ' + total + ' comment' + (total > 1 ? 's' : '') + (file === slides[idx] ? '  (this slide)' : '');
+    head.addEventListener('click', () => { if (file !== slides[idx]) go(slides.indexOf(file)); });
+    commentsListEl.appendChild(head);
+    for (const t of entry.threads) commentsListEl.appendChild(threadRow(t, file));
   }
 }
 
-async function refreshComments() {
+async function refreshComments(force) {
   if (!REPO) return;
   attachSlideInteractions();
   try {
@@ -2380,6 +2453,12 @@ async function refreshComments() {
     slideThreads = { file: slides[idx], issue: null, threads: [] };
   }
   renderPins();
+  if (pendingThreadKey && slideThreads.file === slides[idx]) {
+    const t = slideThreads.threads.find(x => x.key === pendingThreadKey);
+    pendingThreadKey = null;
+    if (t) openThread(t, t.anchor ? (resolveAnchorRect(t.anchor) || [400, 200, 0, 0]) : [400, 200, 0, 0]);
+  }
+  try { await loadAllComments(force); } catch (_) {}
   if (commentsOpen) renderPanel();
 }
 
@@ -2389,7 +2468,7 @@ function openComments() {
   commentsOpen = true;
   commentsPanel.classList.add('open');
   btnComments.classList.add('active');
-  renderPanel();
+  commentsListEl.innerHTML = '<div class="comments-empty">loading…</div>';
   refreshComments();
 }
 function closeComments() {
@@ -2418,6 +2497,15 @@ if (REPO) {
   });
   frame.addEventListener('load', () => {
     attachSlideInteractions();                 // selection live immediately
+    // navigated here from the inbox? open the thread from cache, no refetch wait
+    if (pendingThreadKey) {
+      const entry = deckComments.bySlide[slides[idx]];
+      const t = entry && entry.threads.find(x => x.key === pendingThreadKey);
+      if (t) {
+        pendingThreadKey = null;
+        setTimeout(() => openThread(t, t.anchor ? (resolveAnchorRect(t.anchor) || [400, 200, 0, 0]) : [400, 200, 0, 0]), 250);
+      }
+    }
     setTimeout(refreshComments, 400);          // pins after slide scripts settle
   });
 }

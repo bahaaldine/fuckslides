@@ -56,6 +56,7 @@ module.exports = function scaffold(name, opts = {}) {
   name: '${name}',
   title: '${name}',
   repo: '${repo}',            // powers slide comments (GitHub issues)
+  gateway: 'https://api.fslides.dev',   // sign-in broker for commenting on the published deck
   slidesDir: 'slides',
 
   slides: [

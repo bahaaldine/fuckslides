@@ -34,10 +34,11 @@ Everything merged on main but unpublished:
 
 The single server-side component. Cloudflare Workers (stateless, ~free, global).
 
-- [ ] GitHub App OAuth flow: player shows **"Sign in with GitHub"** → popup → worker callback → short-lived session token to the player
-- [ ] Authenticated comment proxy: read/write issues via user token — inline comments on published decks, private-repo support, 5000 req/hr per user
-- [ ] Player: replace the PAT prompt with the sign-in button (PAT stays as hidden fallback)
-- [ ] Config: `gateway: 'https://api.fslides.dev'` in `fuckslides.config.js` (default for scaffolded decks)
+- [x] Worker built (`packages/gateway/`): OAuth login/callback with HMAC-signed state, origin allow-list, postMessage token hand-off — *needs GitHub App creds + deploy*
+- [x] No proxy needed: player calls api.github.com directly with the user token (CORS-open) — worker stays stateless and tiny
+- [x] Player: "Sign in with GitHub" replaces the PAT prompt (PAT stays as fallback); tokens expire and self-evict
+- [x] Config: `gateway:` plumbed through serve/build/scaffold (scaffold defaults to api.fslides.dev)
+- [ ] **Deploy**: create GitHub App (settings in `packages/gateway/README.md`), point fslides.dev DNS at Cloudflare, `wrangler deploy` + secrets — needs Baha's browser for both
 - Result: decks on plain GitHub Pages get full interactive commenting with zero deck-side infrastructure
 
 ## Phase 2 — fslides.dev front door

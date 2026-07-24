@@ -42,6 +42,7 @@ window.FUCKSLIDES_NAME      = ${nameJson};
 window.FUCKSLIDES_TITLE     = ${titleJson};
 window.FUCKSLIDES_DISABLED  = ${disabledJson};
 window.FUCKSLIDES_REPO      = ${JSON.stringify(repo)};
+window.FUCKSLIDES_GATEWAY   = ${JSON.stringify(config.gateway || null)};
 </script>`;
 
   const playerTemplate = fs.readFileSync(path.join(pkgDir, 'player.html'), 'utf8');

@@ -1849,6 +1849,7 @@ btnNotes.addEventListener('click', toggleNotes);
 // work with zero setup); static/published decks use the public API, with an
 // optional fine-grained PAT for private repos and posting.
 const REPO = window.FUCKSLIDES_REPO || null;
+const GATEWAY = window.FUCKSLIDES_GATEWAY || null;
 const btnComments      = document.getElementById('btn-comments');
 const commentsPanel    = document.getElementById('comments-panel');
 const commentsListEl   = document.getElementById('comments-list');
@@ -1862,7 +1863,43 @@ let commentsOpen = false;
 let openThreadEl = null;
 let slideThreads = { file: null, issue: null, threads: [] };
 let serveComments = false;    // /api/comments reachable → gh-backed transport
-const ghToken = () => { try { return localStorage.getItem('fs-gh-token') || ''; } catch (_) { return ''; } };
+const ghToken = () => {
+  try {
+    const exp = parseInt(localStorage.getItem('fs-gh-token-exp') || '0', 10);
+    if (exp && Date.now() > exp) {
+      localStorage.removeItem('fs-gh-token');
+      localStorage.removeItem('fs-gh-token-exp');
+      return '';
+    }
+    return localStorage.getItem('fs-gh-token') || '';
+  } catch (_) { return ''; }
+};
+
+// ── Sign in with GitHub (via the fslides gateway) ──
+function signInWithGitHub() {
+  if (!GATEWAY) return;
+  const w = 640, h = 760;
+  const x = (screen.width - w) / 2, y = (screen.height - h) / 2;
+  window.open(
+    GATEWAY.replace(/\/$/, '') + '/auth/login?origin=' + encodeURIComponent(location.origin),
+    'fslides-auth',
+    `width=${w},height=${h},left=${x},top=${y}`);
+}
+if (GATEWAY) {
+  window.addEventListener('message', e => {
+    let gwOrigin;
+    try { gwOrigin = new URL(GATEWAY).origin; } catch (_) { return; }
+    if (e.origin !== gwOrigin || !e.data || e.data.type !== 'fslides-auth') return;
+    try {
+      localStorage.setItem('fs-gh-token', e.data.token);
+      localStorage.setItem('fs-gh-token-exp', String(e.data.expiresAt || 0));
+    } catch (_) {}
+    deckComments.at = 0;
+    refreshComments(true);
+    const st = document.querySelector('.thread-status');
+    if (st) st.textContent = '✓ signed in — post away';
+  });
+}
 
 function slideIssueTitle(file) { return '💬 Slide: ' + file; }
 
@@ -2135,7 +2172,9 @@ function openThread(thread, rect) {
   const status = document.createElement('div');
   status.className = 'thread-status';
   if (!serveComments && !ghToken()) {
-    status.innerHTML = 'Posting opens GitHub · <a href="#" id="th-token">use a token instead</a>';
+    status.innerHTML = GATEWAY
+      ? '<a href="#" id="th-signin">Sign in with GitHub</a> to comment inline · <a href="#" id="th-token">token</a>'
+      : 'Posting opens GitHub · <a href="#" id="th-token">use a token instead</a>';
   }
   box.appendChild(status);
 
@@ -2161,6 +2200,8 @@ function openThread(thread, rect) {
       post.disabled = false;
     }
   });
+  const signin = status.querySelector('#th-signin');
+  if (signin) signin.addEventListener('click', e => { e.preventDefault(); signInWithGitHub(); });
   const tok = status.querySelector('#th-token');
   if (tok) tok.addEventListener('click', e => {
     e.preventDefault();

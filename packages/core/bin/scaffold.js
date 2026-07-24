@@ -44,10 +44,12 @@ module.exports = function scaffold(name, opts = {}) {
   // ── 1. local files ──
   fs.mkdirSync(path.join(dir, 'slides'), { recursive: true });
 
-  // template slides
+  // template slides — the cover must NOT be named index.html, so the built
+  // player can own the root URL on Pages
   const tplSlides = path.join(pkgDir, 'template', 'slides');
   for (const f of fs.readdirSync(tplSlides)) {
-    fs.copyFileSync(path.join(tplSlides, f), path.join(dir, 'slides', f));
+    const dest = f === 'index.html' ? 'cover.html' : f;
+    fs.copyFileSync(path.join(tplSlides, f), path.join(dir, 'slides', dest));
   }
 
   fs.writeFileSync(path.join(dir, 'fuckslides.config.js'), `module.exports = {
@@ -57,7 +59,7 @@ module.exports = function scaffold(name, opts = {}) {
   slidesDir: 'slides',
 
   slides: [
-    'index.html',
+    'cover.html',
   ],
 
   labels: [

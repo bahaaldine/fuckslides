@@ -242,6 +242,64 @@ window.FUCKSLIDES_REPO      = ${JSON.stringify(repo)};
       return;
     }
 
+    // ── Comments (gh CLI-backed: works for private repos with local auth) ──
+    if (req.method === 'GET' && urlPath === '/api/comments') {
+      const file = new URL(req.url, 'http://localhost').searchParams.get('file');
+      if (!repo || !file) { res.writeHead(repo ? 400 : 501); res.end('{}'); return; }
+      try {
+        const title = '\ud83d\udcac Slide: ' + path.basename(file);
+        const listJson = execSync(
+          `gh issue list --repo ${repo} --state open --search ${JSON.stringify('in:title "' + title + '"')} --json number,title,body,author,createdAt,url`,
+          { encoding: 'utf8', stdio: 'pipe' });
+        const issues = JSON.parse(listJson);
+        const issue = issues.find(i => i.title === title) || null;
+        let comments = [];
+        if (issue) {
+          if (issue.body && issue.body.trim()) {
+            comments.push({ user: { login: issue.author.login }, body: issue.body, created_at: issue.createdAt, html_url: issue.url });
+          }
+          const cJson = execSync(`gh api repos/${repo}/issues/${issue.number}/comments --paginate`, { encoding: 'utf8', stdio: 'pipe' });
+          comments = comments.concat(JSON.parse(cJson));
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ issue: issue ? { number: issue.number, html_url: issue.url } : null, comments }));
+      } catch (e) {
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'gh failed: ' + String(e.message).split('\n')[0] }));
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && urlPath === '/api/comment') {
+      let body = '';
+      req.on('data', c => { body += c; });
+      req.on('end', () => {
+        if (!repo) { res.writeHead(501); res.end('{}'); return; }
+        try {
+          const { file, text } = JSON.parse(body);
+          const title = '\ud83d\udcac Slide: ' + path.basename(file);
+          const listJson = execSync(
+            `gh issue list --repo ${repo} --state open --search ${JSON.stringify('in:title "' + title + '"')} --json number,title`,
+            { encoding: 'utf8', stdio: 'pipe' });
+          const existing = JSON.parse(listJson).find(i => i.title === title);
+          const tmp = path.join(require('os').tmpdir(), 'fslides-comment-' + Date.now() + '.md');
+          fs.writeFileSync(tmp, text, 'utf8');
+          if (existing) {
+            execSync(`gh issue comment ${existing.number} --repo ${repo} --body-file ${JSON.stringify(tmp)}`, { encoding: 'utf8', stdio: 'pipe' });
+          } else {
+            execSync(`gh issue create --repo ${repo} --title ${JSON.stringify(title)} --body-file ${JSON.stringify(tmp)}`, { encoding: 'utf8', stdio: 'pipe' });
+          }
+          fs.unlinkSync(tmp);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: String(e.message).split('\n')[0] }));
+        }
+      });
+      return;
+    }
+
     if (req.method === 'GET' && urlPath === '/api/recordings') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(scanRecordings()));

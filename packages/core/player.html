@@ -280,6 +280,63 @@
     }
     .voice-pop-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
 
+    /* ── Anchored comments ── */
+    #anchor-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+    .pick-highlight {
+      position: absolute; pointer-events: none;
+      border: 2px solid #38BDF8; border-radius: 4px;
+      background: rgba(56,189,248,0.08);
+      box-shadow: 0 0 0 4000px rgba(0,0,0,0.12);
+      transition: all 0.06s ease;
+    }
+    .comment-pin {
+      position: absolute; width: 34px; height: 34px; border-radius: 50% 50% 50% 6px;
+      background: #38BDF8; color: #0d0f14;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Inter', -apple-system, sans-serif; font-size: 15px; font-weight: 800;
+      pointer-events: auto; cursor: pointer;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.45);
+      transform: translate(-6px, -100%);
+      transition: background 0.15s;
+    }
+    .comment-pin:hover, .comment-pin.open { background: #7DD3FC; }
+    .comment-thread {
+      position: absolute; width: 460px; max-height: 480px;
+      background: rgba(13,15,20,0.98); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.14); border-radius: 12px;
+      box-shadow: 0 16px 50px rgba(0,0,0,0.6);
+      pointer-events: auto; z-index: 20;
+      display: flex; flex-direction: column;
+      font-family: 'Inter', -apple-system, sans-serif;
+    }
+    .thread-anchor-label {
+      flex-shrink: 0; padding: 12px 18px 10px;
+      font-size: 0.78rem; color: rgba(255,255,255,0.4);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .thread-anchor-label strong { color: rgba(255,255,255,0.75); font-weight: 600; }
+    .thread-comments { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 18px; scrollbar-width: thin; }
+    .thread-composer { flex-shrink: 0; display: flex; gap: 10px; padding: 12px 18px 14px; border-top: 1px solid rgba(255,255,255,0.07); }
+    .thread-composer textarea {
+      flex: 1; min-height: 60px; resize: vertical;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+      padding: 10px 12px; color: rgba(255,255,255,0.85);
+      font-family: 'Inter', -apple-system, sans-serif; font-size: 0.85rem; line-height: 1.5; outline: none;
+    }
+    .thread-composer textarea:focus { border-color: rgba(56,189,248,0.5); }
+    .thread-actions { display: flex; flex-direction: column; gap: 8px; }
+    .thread-btn {
+      background: #38BDF8; color: #0d0f14; border: none; border-radius: 8px;
+      padding: 9px 16px; font-size: 0.8rem; font-weight: 700; cursor: pointer;
+      font-family: 'Inter', -apple-system, sans-serif;
+    }
+    .thread-btn:disabled { opacity: 0.4; cursor: default; }
+    .thread-btn.ghost { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.6); }
+    .thread-status { padding: 0 18px 10px; font-size: 0.7rem; color: rgba(255,255,255,0.35); }
+    .thread-status a { color: #38BDF8; text-decoration: none; }
+    body.commenting #slide-frame { cursor: crosshair; }
+
     /* ── Comments (GitHub issues) ── */
     #comments-panel {
       position: fixed; bottom: 0; left: 0; right: 0; height: 300px;
@@ -564,6 +621,7 @@
 
 <div id="slide-wrapper">
   <iframe id="slide-frame"></iframe>
+  <div id="anchor-layer"></div>
   <div id="transition-fade"></div>
   <div id="interaction-overlay"></div>
   <div id="laser-dot"></div>
@@ -618,7 +676,8 @@
   <div class="comments-header">
     <span>Comments</span>
     <span class="comments-slide-name" id="comments-slide-name"></span>
-    <a class="comments-add" id="comments-add" target="_blank" rel="noopener">+ Comment on GitHub</a>
+    <button class="comments-add" id="comments-pick">+ Comment — click anything on the slide</button>
+    <a class="comments-add" id="comments-gh-link" target="_blank" rel="noopener" style="background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.15); color:rgba(255,255,255,0.55)">Open on GitHub ↗</a>
   </div>
   <div id="comments-list"></div>
 </div>
@@ -1269,6 +1328,8 @@ function handleKey(key) {
   if (key === 'Escape') {
     if (laserMode) { deactivateLaser(); return; }
     if (drawMode)  { deactivateDraw();  return; }
+    if (pickMode) { exitPickMode(); return; }
+    if (openThreadEl) { closeThread(); return; }
     if (voiceOpen) { closeVoicePanel(); return; }
     if (commentsOpen) { closeComments(); return; }
     if (ovOpen) { closeOverview(); return; } if (fsOpen) { closeFilmstrip(); return; }
@@ -1291,7 +1352,9 @@ document.addEventListener('keydown', e => {
   if (editorOpen && (e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); return; }
   if (editorOpen && e.key === 'Escape') { e.preventDefault(); closeEditor(); return; }
   if (editorOpen) return;
-  if (e.target === notesTextarea) return;
+  // never hijack typing in any form field (comment composer, device pickers, …)
+  const t = e.target;
+  if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.isContentEditable)) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   e.preventDefault(); handleKey(e.key);
 });
@@ -1736,73 +1799,209 @@ notesTextarea.addEventListener('keydown', e => {
 });
 btnNotes.addEventListener('click', toggleNotes);
 
-// ── Comments — backed by GitHub issues ───────────────────────────────────────
-// One issue per slide, created lazily: "+ Comment" deep-links to a prefilled
-// new-issue form (or the existing slide issue), so any GitHub user can comment
-// with zero auth wiring. Existing comments are fetched from the public REST
-// API — works identically under `fslides serve` and on a published static
-// deck. The repo comes from config.repo or the git remote at serve/build time.
+// ── Anchored comments — Google-Slides-style pins backed by GitHub issues ─────
+// Pick mode: click Comments → hover highlights any element in the slide →
+// click opens a composer anchored to it. Each comment carries a hidden anchor
+// header (CSS path + rect + snippet) inside the GitHub comment body; the
+// player groups comments into threads per anchor and renders numbered pins.
+// Transport: fslides serve proxies through the local gh CLI (private repos
+// work with zero setup); static/published decks use the public API, with an
+// optional fine-grained PAT for private repos and posting.
 const REPO = window.FUCKSLIDES_REPO || null;
 const btnComments      = document.getElementById('btn-comments');
 const commentsPanel    = document.getElementById('comments-panel');
 const commentsListEl   = document.getElementById('comments-list');
 const commentsSlideEl  = document.getElementById('comments-slide-name');
-const commentsAddEl    = document.getElementById('comments-add');
+const commentsPickBtn  = document.getElementById('comments-pick');
+const commentsGhLink   = document.getElementById('comments-gh-link');
 const commentCountEl   = document.getElementById('comment-count');
+const anchorLayer      = document.getElementById('anchor-layer');
+
 let commentsOpen = false;
-const commentsCache = {};   // slide -> { issue, comments: [...] }
+let pickMode     = false;
+let openThreadEl = null;
+let slideThreads = { file: null, issue: null, threads: [] };
+let serveComments = false;    // /api/comments reachable → gh-backed transport
+const ghToken = () => { try { return localStorage.getItem('fs-gh-token') || ''; } catch (_) { return ''; } };
 
-function slideIssueTitle(file) { return '\ud83d\udcac Slide: ' + file; }
+function slideIssueTitle(file) { return '💬 Slide: ' + file; }
 
-function ghHeaders() { return { Accept: 'application/vnd.github+json' }; }
+// ── anchor helpers ──
+const ANCHOR_RE = /<!--fslides-anchor (\{[\s\S]*?\})-->/;
+function parseAnchor(body) {
+  const m = (body || '').match(ANCHOR_RE);
+  if (!m) return null;
+  try { return JSON.parse(m[1]); } catch (_) { return null; }
+}
+function stripAnchor(body) {
+  return (body || '').replace(ANCHOR_RE, '').replace(/^>\s*📍[^\n]*\n?/m, '').trim();
+}
+function cssPath(el, doc) {
+  const parts = [];
+  while (el && el !== doc.body && el.parentElement) {
+    const idx = Array.prototype.indexOf.call(el.parentElement.children, el) + 1;
+    parts.unshift(el.tagName.toLowerCase() + ':nth-child(' + idx + ')');
+    el = el.parentElement;
+  }
+  return 'body>' + parts.join('>');
+}
+function snippetOf(el) {
+  const t = (el.textContent || '').trim().replace(/\s+/g, ' ');
+  return t.slice(0, 60) || ('<' + el.tagName.toLowerCase() + '>');
+}
+function resolveAnchorRect(anchor) {
+  try {
+    const doc = frame.contentDocument;
+    if (doc && anchor.sel) {
+      const el = doc.querySelector(anchor.sel);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        if (r.width || r.height) return [r.left, r.top, r.width, r.height];
+      }
+    }
+  } catch (_) {}
+  return anchor.rect || null;   // snapshot fallback when the DOM changed
+}
 
-async function fetchSlideIssue(file) {
-  if (commentsCache[file]) return commentsCache[file];
+// ── transport ──
+if (!window.FUCKSLIDES_EXPORT) {
+  fetch('/api/comments?file=probe').then(r => {
+    serveComments = r.status !== 404;
+    if (serveComments && REPO) refreshComments();   // initial load may have raced the probe
+  }).catch(() => {});
+}
+async function fetchComments(file) {
+  if (serveComments) {
+    const r = await fetch('/api/comments?file=' + encodeURIComponent(file));
+    if (!r.ok) throw new Error('serve ' + r.status);
+    return r.json();
+  }
+  const headers = { Accept: 'application/vnd.github+json' };
+  if (ghToken()) headers.Authorization = 'Bearer ' + ghToken();
   const q = encodeURIComponent(`repo:${REPO} in:title "${slideIssueTitle(file)}"`);
-  const r = await fetch('https://api.github.com/search/issues?q=' + q, { headers: ghHeaders() });
-  if (!r.ok) throw new Error('gh api ' + r.status);
+  const r = await fetch('https://api.github.com/search/issues?q=' + q, { headers });
+  if (!r.ok) throw new Error('gh ' + r.status);
   const data = await r.json();
   const issue = (data.items || []).find(i => i.title === slideIssueTitle(file)) || null;
   let comments = [];
   if (issue) {
-    // the issue body is the first comment
-    if (issue.body && issue.body.trim()) {
-      comments.push({ user: issue.user, body: issue.body, created_at: issue.created_at });
-    }
+    if (issue.body && issue.body.trim()) comments.push({ user: issue.user, body: issue.body, created_at: issue.created_at, html_url: issue.html_url });
     if (issue.comments > 0) {
-      const cr = await fetch(issue.comments_url + '?per_page=100', { headers: ghHeaders() });
+      const cr = await fetch(issue.comments_url + '?per_page=100', { headers });
       if (cr.ok) comments = comments.concat(await cr.json());
     }
   }
-  const entry = { issue, comments };
-  commentsCache[file] = entry;
-  return entry;
+  return { issue: issue ? { number: issue.number, html_url: issue.html_url } : null, comments };
 }
-
-function newIssueUrl(file) {
-  const label = labels[slides.indexOf(file)] || file;
-  const title = slideIssueTitle(file);
-  const body  = `Feedback on **${label}** (\`${file}\`).\n\n<!-- Add your comment below. Further feedback on this slide: comment on this issue rather than opening a new one. -->\n\n`;
-  return `https://github.com/${REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
-}
-
-function renderComments(file, entry) {
-  commentsSlideEl.textContent = file;
-  commentsAddEl.href = entry.issue ? entry.issue.html_url : newIssueUrl(file);
-  commentsListEl.innerHTML = '';
-  if (!entry.comments.length) {
-    const d = document.createElement('div');
-    d.className = 'comments-empty';
-    d.textContent = 'No comments on this slide yet — be the first.';
-    commentsListEl.appendChild(d);
-    return;
+async function postComment(file, text) {
+  if (serveComments) {
+    const r = await fetch('/api/comment', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file, text }),
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'post failed');
+    return true;
   }
-  for (const c of entry.comments) {
+  if (ghToken()) {
+    const headers = { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + ghToken(), 'Content-Type': 'application/json' };
+    if (slideThreads.issue) {
+      const r = await fetch(`https://api.github.com/repos/${REPO}/issues/${slideThreads.issue.number}/comments`, {
+        method: 'POST', headers, body: JSON.stringify({ body: text }) });
+      if (!r.ok) throw new Error('gh ' + r.status);
+    } else {
+      const r = await fetch(`https://api.github.com/repos/${REPO}/issues`, {
+        method: 'POST', headers, body: JSON.stringify({ title: slideIssueTitle(file), body: text }) });
+      if (!r.ok) throw new Error('gh ' + r.status);
+    }
+    return true;
+  }
+  // no auth: hand off to GitHub with the anchored body prefilled
+  const url = slideThreads.issue
+    ? slideThreads.issue.html_url
+    : `https://github.com/${REPO}/issues/new?title=${encodeURIComponent(slideIssueTitle(file))}&body=${encodeURIComponent(text)}`;
+  window.open(url, '_blank', 'noopener');
+  return false;
+}
+
+// ── data → threads ──
+async function loadComments() {
+  const file = slides[idx];
+  const data = await fetchComments(file);
+  const threads = [];
+  const byKey = {};
+  for (const c of data.comments || []) {
+    const anchor = parseAnchor(c.body);
+    const key = anchor && anchor.sel ? anchor.sel : '__general__';
+    if (!byKey[key]) {
+      byKey[key] = { key, anchor: anchor || null, comments: [] };
+      threads.push(byKey[key]);
+    }
+    if (anchor && !byKey[key].anchor) byKey[key].anchor = anchor;
+    byKey[key].comments.push({ user: c.user, created_at: c.created_at, text: stripAnchor(c.body) });
+  }
+  slideThreads = { file, issue: data.issue, threads };
+  return slideThreads;
+}
+
+// ── pins ──
+function clearPins() {
+  anchorLayer.querySelectorAll('.comment-pin, .comment-thread, .pick-highlight').forEach(e => e.remove());
+  openThreadEl = null;
+}
+function renderPins() {
+  if (slideThreads.file !== slides[idx]) return;
+  anchorLayer.querySelectorAll('.comment-pin').forEach(e => e.remove());
+  let n = 0;
+  for (const t of slideThreads.threads) {
+    if (!t.anchor) continue;
+    const rect = resolveAnchorRect(t.anchor);
+    if (!rect) continue;
+    n++;
+    const pin = document.createElement('div');
+    pin.className = 'comment-pin';
+    pin.textContent = t.comments.length;
+    pin.style.left = Math.min(rect[0] + rect[2], 1240) + 'px';
+    pin.style.top  = Math.max(rect[1], 26) + 'px';
+    pin.addEventListener('click', e => { e.stopPropagation(); openThread(t, rect); });
+    anchorLayer.appendChild(pin);
+  }
+  updateCommentBadge();
+}
+function updateCommentBadge() {
+  const total = slideThreads.file === slides[idx]
+    ? slideThreads.threads.reduce((a, t) => a + t.comments.length, 0) : 0;
+  commentCountEl.style.display = total ? 'flex' : 'none';
+  commentCountEl.textContent = total > 9 ? '9+' : total;
+}
+
+// ── thread popover ──
+function closeThread() { if (openThreadEl) { openThreadEl.remove(); openThreadEl = null; } }
+function openThread(thread, rect) {
+  closeThread();
+  const box = document.createElement('div');
+  box.className = 'comment-thread';
+  const x = Math.max(8, Math.min(rect ? rect[0] + rect[2] + 14 : 400, 1280 - 475));
+  const y = Math.max(8, Math.min(rect ? rect[1] : 200, 720 - 320));
+  box.style.left = x + 'px';
+  box.style.top  = y + 'px';
+
+  const label = document.createElement('div');
+  label.className = 'thread-anchor-label';
+  label.innerHTML = thread && thread.anchor
+    ? '📍 On: <strong></strong>'
+    : '💬 <strong>Slide comment</strong>';
+  if (thread && thread.anchor) label.querySelector('strong').textContent = '“' + (thread.anchor.snippet || 'element') + '”';
+  box.appendChild(label);
+
+  const list = document.createElement('div');
+  list.className = 'thread-comments';
+  for (const c of (thread ? thread.comments : [])) {
     const item = document.createElement('div');
     item.className = 'comment-item';
     const av = document.createElement('img');
     av.className = 'comment-avatar';
-    av.src = (c.user && c.user.avatar_url) ? c.user.avatar_url + '&s=52' : '';
+    av.src = (c.user && c.user.avatar_url) ? c.user.avatar_url : '';
     av.onerror = function() { this.style.visibility = 'hidden'; };
     const body = document.createElement('div');
     body.className = 'comment-body';
@@ -1814,44 +2013,175 @@ function renderComments(file, entry) {
     meta.appendChild(document.createTextNode(' · ' + new Date(c.created_at).toLocaleDateString()));
     const text = document.createElement('div');
     text.className = 'comment-text';
-    text.textContent = c.body || '';
+    text.textContent = c.text;
     body.appendChild(meta); body.appendChild(text);
     item.appendChild(av); item.appendChild(body);
-    commentsListEl.appendChild(item);
+    list.appendChild(item);
   }
+  box.appendChild(list);
+
+  const composer = document.createElement('div');
+  composer.className = 'thread-composer';
+  const ta = document.createElement('textarea');
+  ta.placeholder = thread && thread.comments.length ? 'Reply…' : 'Add a comment…';
+  const actions = document.createElement('div');
+  actions.className = 'thread-actions';
+  const post = document.createElement('button');
+  post.className = 'thread-btn';
+  post.textContent = 'Post';
+  const cancel = document.createElement('button');
+  cancel.className = 'thread-btn ghost';
+  cancel.textContent = 'Close';
+  cancel.addEventListener('click', closeThread);
+  actions.appendChild(post); actions.appendChild(cancel);
+  composer.appendChild(ta); composer.appendChild(actions);
+  box.appendChild(composer);
+
+  const status = document.createElement('div');
+  status.className = 'thread-status';
+  if (!serveComments && !ghToken()) {
+    status.innerHTML = 'Posting opens GitHub · <a href="#" id="th-token">use a token instead</a>';
+  }
+  box.appendChild(status);
+
+  post.addEventListener('click', async () => {
+    const val = ta.value.trim();
+    if (!val) return;
+    post.disabled = true;
+    status.textContent = 'posting…';
+    const anchor = thread ? thread.anchor : box._pendingAnchor;
+    const header = anchor ? '<!--fslides-anchor ' + JSON.stringify(anchor) + '-->\n> 📍 ' + (anchor.snippet || '') + '\n\n' : '';
+    try {
+      const posted = await postComment(slides[idx], header + val);
+      if (posted) {
+        status.textContent = '✓ posted';
+        await refreshComments();
+        closeThread();
+      } else {
+        status.textContent = 'finish posting in the GitHub tab, then reopen';
+      }
+    } catch (e) {
+      status.textContent = 'failed: ' + e.message;
+      post.disabled = false;
+    }
+  });
+  const tok = status.querySelector('#th-token');
+  if (tok) tok.addEventListener('click', e => {
+    e.preventDefault();
+    const t = window.prompt('Paste a fine-grained GitHub token with Issues read/write on ' + REPO + ' (stored only in this browser):');
+    if (t) { try { localStorage.setItem('fs-gh-token', t.trim()); } catch (_) {} status.textContent = 'token saved'; }
+  });
+
+  anchorLayer.appendChild(box);
+  openThreadEl = box;
+  setTimeout(() => ta.focus(), 50);
+  return box;
 }
 
-async function loadCommentsForSlide() {
-  if (!REPO) return;
-  const file = slides[idx];
-  commentsSlideEl.textContent = file;
-  commentsAddEl.href = newIssueUrl(file);
-  commentsListEl.innerHTML = '<div class="comments-empty">loading…</div>';
+// ── pick mode ──
+let pickHl = null;
+function enterPickMode() {
+  if (pickMode) return;
+  pickMode = true;
+  document.body.classList.add('commenting');
+  commentsPickBtn.textContent = 'Click an element… (Esc to cancel)';
   try {
-    const entry = await fetchSlideIssue(file);
-    if (slides[idx] === file) renderComments(file, entry);
-  } catch (_) {
-    // Private repo (API can't read it anonymously) or rate-limited: the panel
-    // becomes a launcher — GitHub's own UI works fine with the viewer's session.
-    const issuesUrl = 'https://github.com/' + REPO + '/issues?q=' + encodeURIComponent('in:title "' + slideIssueTitle(file) + '"');
-    commentsListEl.innerHTML = '';
+    const doc = frame.contentDocument;
+    doc.addEventListener('mousemove', pickMove, true);
+    doc.addEventListener('click', pickClick, true);
+  } catch (_) { exitPickMode(); }
+}
+function exitPickMode() {
+  pickMode = false;
+  document.body.classList.remove('commenting');
+  commentsPickBtn.textContent = '+ Comment — click anything on the slide';
+  if (pickHl) { pickHl.remove(); pickHl = null; }
+  try {
+    const doc = frame.contentDocument;
+    doc.removeEventListener('mousemove', pickMove, true);
+    doc.removeEventListener('click', pickClick, true);
+  } catch (_) {}
+}
+function pickMove(e) {
+  const el = e.target;
+  if (!el || el === frame.contentDocument.body || el === frame.contentDocument.documentElement) {
+    if (pickHl) pickHl.style.display = 'none';
+    return;
+  }
+  const r = el.getBoundingClientRect();
+  if (!pickHl) { pickHl = document.createElement('div'); pickHl.className = 'pick-highlight'; anchorLayer.appendChild(pickHl); }
+  pickHl.style.display = 'block';
+  pickHl.style.left = r.left + 'px';
+  pickHl.style.top = r.top + 'px';
+  pickHl.style.width = r.width + 'px';
+  pickHl.style.height = r.height + 'px';
+}
+function pickClick(e) {
+  e.preventDefault(); e.stopPropagation();
+  const el = e.target;
+  const doc = frame.contentDocument;
+  if (!el || el === doc.body || el === doc.documentElement) return;
+  const r = el.getBoundingClientRect();
+  const anchor = {
+    v: 1,
+    sel: cssPath(el, doc),
+    rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+    snippet: snippetOf(el),
+  };
+  exitPickMode();
+  const box = openThread(null, anchor.rect);
+  box._pendingAnchor = anchor;
+}
+
+// ── panel (thread list) ──
+function renderPanel() {
+  commentsSlideEl.textContent = slides[idx];
+  commentsGhLink.href = slideThreads.issue
+    ? slideThreads.issue.html_url
+    : 'https://github.com/' + REPO + '/issues?q=' + encodeURIComponent('in:title "' + slideIssueTitle(slides[idx]) + '"');
+  commentsListEl.innerHTML = '';
+  if (!slideThreads.threads.length) {
     const d = document.createElement('div');
     d.className = 'comments-empty';
-    d.appendChild(document.createTextNode('Comments for this deck live on GitHub (private repo or rate limit). '));
-    const a = document.createElement('a');
-    a.href = issuesUrl; a.target = '_blank'; a.rel = 'noopener';
-    a.textContent = 'Open this slide\u2019s comments \u2197';
-    d.appendChild(a);
+    d.textContent = 'No comments on this slide yet — click "+ Comment" and pick any element.';
     commentsListEl.appendChild(d);
+    return;
+  }
+  for (const t of slideThreads.threads) {
+    const row = document.createElement('div');
+    row.className = 'comment-item';
+    row.style.cursor = 'pointer';
+    const body = document.createElement('div');
+    body.className = 'comment-body';
+    const meta = document.createElement('div');
+    meta.className = 'comment-meta';
+    const who = document.createElement('strong');
+    who.textContent = t.anchor ? '📍 “' + (t.anchor.snippet || 'element') + '”' : '💬 Slide comment';
+    meta.appendChild(who);
+    meta.appendChild(document.createTextNode(' · ' + t.comments.length + ' comment' + (t.comments.length > 1 ? 's' : '')));
+    const text = document.createElement('div');
+    text.className = 'comment-text';
+    const last = t.comments[t.comments.length - 1];
+    text.textContent = ((last.user && last.user.login) || '') + ': ' + last.text.slice(0, 120);
+    body.appendChild(meta); body.appendChild(text);
+    row.appendChild(body);
+    row.addEventListener('click', () => {
+      const rect = t.anchor ? resolveAnchorRect(t.anchor) : null;
+      openThread(t, rect || [400, 200, 0, 0]);
+    });
+    commentsListEl.appendChild(row);
   }
 }
 
-function updateCommentBadge() {
+async function refreshComments() {
   if (!REPO) return;
-  const entry = commentsCache[slides[idx]];
-  const n = entry ? entry.comments.length : 0;
-  commentCountEl.style.display = n ? 'flex' : 'none';
-  commentCountEl.textContent = n > 9 ? '9+' : n;
+  try {
+    await loadComments();
+  } catch (_) {
+    slideThreads = { file: slides[idx], issue: null, threads: [] };
+  }
+  renderPins();
+  if (commentsOpen) renderPanel();
 }
 
 function openComments() {
@@ -1860,7 +2190,8 @@ function openComments() {
   commentsOpen = true;
   commentsPanel.classList.add('open');
   btnComments.classList.add('active');
-  loadCommentsForSlide().then(updateCommentBadge);
+  renderPanel();
+  refreshComments();
 }
 function closeComments() {
   commentsOpen = false;
@@ -1871,13 +2202,15 @@ function toggleComments() { commentsOpen ? closeComments() : openComments(); }
 
 function commentsOnSlideChange() {
   if (!REPO) return;
+  clearPins();
   updateCommentBadge();
-  if (commentsOpen) loadCommentsForSlide().then(updateCommentBadge);
 }
 
 if (REPO) {
   btnComments.style.display = '';
   btnComments.addEventListener('click', toggleComments);
+  commentsPickBtn.addEventListener('click', () => { pickMode ? exitPickMode() : enterPickMode(); });
+  frame.addEventListener('load', () => { setTimeout(refreshComments, 400); });
 }
 
 // ── Voice-over / video narration ─────────────────────────────────────────────

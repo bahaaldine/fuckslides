@@ -2057,8 +2057,14 @@ function renderPins() {
   updateCommentBadge();
 }
 function updateCommentBadge() {
-  const total = slideThreads.file === slides[idx]
-    ? slideThreads.threads.reduce((a, t) => a + t.comments.length, 0) : 0;
+  // deck-wide count — the panel is an inbox for the whole deck
+  let total = 0;
+  for (const entry of Object.values(deckComments.bySlide)) {
+    total += entry.threads.reduce((a, t) => a + t.comments.length, 0);
+  }
+  if (!total && slideThreads.file === slides[idx]) {
+    total = slideThreads.threads.reduce((a, t) => a + t.comments.length, 0);
+  }
   commentCountEl.style.display = total ? 'flex' : 'none';
   commentCountEl.textContent = total > 9 ? '9+' : total;
 }
@@ -2459,6 +2465,7 @@ async function refreshComments(force) {
     if (t) openThread(t, t.anchor ? (resolveAnchorRect(t.anchor) || [400, 200, 0, 0]) : [400, 200, 0, 0]);
   }
   try { await loadAllComments(force); } catch (_) {}
+  updateCommentBadge();
   if (commentsOpen) renderPanel();
 }
 

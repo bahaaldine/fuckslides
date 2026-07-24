@@ -660,10 +660,6 @@
     <span class="nav-label">Comments</span>
     <span class="comment-count" id="comment-count" style="display:none"></span>
   </button>
-  <button class="nav-btn" id="btn-presenter" title="Presenter view: notes + next slide (P)">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="9" height="7" rx="1"/><rect x="6" y="9" width="9" height="6" rx="1"/><path d="M3 9v1M5 9v1"/></svg>
-    <span class="nav-label">Presenter</span>
-  </button>
   <div class="nav-sep"></div>
   <button class="nav-btn" id="btn-fs" title="Fullscreen — toolbar hides while presenting (F)">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>
@@ -1251,7 +1247,6 @@ function handleKey(key) {
   if (key === 'n' || key === 'N') { toggleNotes(); return; }
   if (key === 'v' || key === 'V') { voiceToggle(); return; }
   if (key === 'k' || key === 'K') { toggleComments(); return; }
-  if (key === 'p' || key === 'P') { openPresenterView(); return; }
   if (key === 'l' || key === 'L') { toggleLaser(); return; }
   if (key === 'd' || key === 'D') { if (!ovOpen) { toggleDraw(); return; } }
   if (key === 'c' || key === 'C') { timerToggle(); return; }
@@ -1306,7 +1301,6 @@ btnNext.addEventListener('click', () => go(idx + 1));
 btnFs.addEventListener('click', () => toggleFullscreen());
 btnOv.addEventListener('click', () => toggleOverview());
 btnFs2.addEventListener('click', () => toggleFilmstrip());
-document.getElementById('btn-presenter').addEventListener('click', openPresenterView);
 overview.addEventListener('click', e => { if (e.target === overview) closeOverview(); });
 
 // ── Editor ────────────────────────────────────────────────────────────────────
@@ -2109,12 +2103,6 @@ setMode(recMode);
 
 // Mic only appears when the serve API is actually reachable — never for
 // viewers of an exported/deployed player.
-// Hide server-only controls in exported presentations
-if (window.FUCKSLIDES_EXPORT) {
-  const presBtn = document.getElementById('btn-presenter');
-  if (presBtn) presBtn.style.display = 'none';
-}
-
 if (!window.FUCKSLIDES_EXPORT) {
   fetch('/api/recordings')
     .then(r => { if (!r.ok) throw new Error('no api'); return r.json(); })
